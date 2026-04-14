@@ -1,0 +1,48 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/seishun-srs-app/node_modules
+/seishun-srs-app/.pnp
+/seishun-srs-app/.pnp.*
+/seishun-srs-app/.yarn/*
+/seishun-srs-app/!.yarn/patches
+/seishun-srs-app/!.yarn/plugins
+/seishun-srs-app/!.yarn/releases
+/seishun-srs-app/!.yarn/versions
+
+# testing
+/seishun-srs-app/coverage
+
+# next.js
+/seishun-srs-app/.next/
+/seishun-srs-app/out/
+
+# production
+/seishun-srs-app/build
+
+# misc
+/seishun-srs-app/.DS_Store
+/seishun-srs-app/*.pem
+
+# debug
+/seishun-srs-app/npm-debug.log*
+/seishun-srs-app/yarn-debug.log*
+/seishun-srs-app/yarn-error.log*
+/seishun-srs-app/.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+/seishun-srs-app/.env*
+
+# vercel
+/seishun-srs-app/.vercel
+
+# typescript
+/seishun-srs-app/*.tsbuildinfo
+/seishun-srs-app/next-env.d.ts
+scrape_oldpy.py
+seishun-srs-app/public/assets/bunny_vol_2.webp
+.claude/settings.local.json
+.env
+seishun-srs-app/CLAUDE.md
+scripts/.cache/jmdict-eng.json
+scripts/.cache/jmdict-examples-eng.json
