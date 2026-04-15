@@ -1,6 +1,6 @@
-# Seishun SRS
+# Japanese Learning Tool
 
-A personal Japanese vocabulary SRS (spaced-repetition) app built around the *Seishun Buta Yarou* light novel series. Vocabulary is scraped directly from the novels, enriched with JMdict data, and reviewed with an SM-2 algorithm — similar in spirit to [JPDB](https://jpdb.io) or Anki, but tailored to a specific reading list.
+A personal Japanese vocabulary SRS (spaced-repetition) app built around the the ability to import light novel series. Vocabulary is scraped directly from the novels, enriched with JMdict data, and reviewed with an SM-2 algorithm — similar in spirit to [JPDB](https://jpdb.io) or Anki, but tailored to a specific reading list.
 
 ## Features
 
