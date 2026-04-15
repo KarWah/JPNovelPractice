@@ -200,6 +200,15 @@ def find_best_match(kanji, kana, by_kanji, by_kana):
 
     if not candidates:
         candidates = by_kana.get(kana, [])
+        if len(candidates) > 1:
+            # Prefer entries where the searched kana is the *primary* (first) reading,
+            # not just any reading.  Without this filter a word like "この" (kono)
+            # could accidentally match 九 (nine) whose readings are
+            # ["きゅう","く","ここの","この","ここ"] — "この" appears but is not primary.
+            primary = [e for e in candidates
+                       if e.get("kana", [{}])[0].get("text") == kana]
+            if primary:
+                candidates = primary
 
     return candidates[0] if candidates else None
 

@@ -17,10 +17,47 @@ interface ReviewData {
 // How many times a card can be re-queued in one session after "Again"
 const MAX_REQUEUES = 2;
 
+// How long (ms) a saved session remains valid before we discard it and load fresh
+const SESSION_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours
+
+interface SavedSession {
+  cards: SessionCard[];
+  current: number;
+  revealed: boolean;
+  stats: { reviewed: number; correct: number };
+  requeueCount: [number, number][];
+  sessionDone: boolean;
+  savedAt: number;
+}
+
+function sessionKey(novelId: string, count: string) {
+  return `srs:session:v1:${novelId}:${count}`;
+}
+
+function readSavedSession(key: string): SavedSession | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    const parsed: SavedSession = JSON.parse(raw);
+    if (
+      Date.now() - parsed.savedAt > SESSION_TTL_MS ||
+      parsed.sessionDone
+    ) {
+      sessionStorage.removeItem(key);
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
 export default function StudyPage() {
   const searchParams = useSearchParams();
   const novelId = searchParams.get("novelId") ?? "1";
   const count = searchParams.get("count") ?? "20";
+  const storageKey = sessionKey(novelId, count);
 
   const [cards, setCards] = useState<SessionCard[]>([]);
   const [current, setCurrent] = useState(0);
@@ -32,7 +69,23 @@ export default function StudyPage() {
   // Track how many times each card has been re-queued this session
   const requeueCount = useRef<Map<number, number>>(new Map());
 
+  // Persist session state so browser-back after "View full details" restores exactly where we were
+  useEffect(() => {
+    if (loading) return;
+    const snapshot: SavedSession = {
+      cards,
+      current,
+      revealed,
+      stats,
+      requeueCount: Array.from(requeueCount.current.entries()),
+      sessionDone,
+      savedAt: Date.now(),
+    };
+    try { sessionStorage.setItem(storageKey, JSON.stringify(snapshot)); } catch { /* quota */ }
+  }, [cards, current, revealed, stats, sessionDone, loading, storageKey]);
+
   const loadCards = useCallback(() => {
+    if (typeof window !== "undefined") sessionStorage.removeItem(storageKey);
     setLoading(true);
     setSessionDone(false);
     setCurrent(0);
@@ -48,11 +101,24 @@ export default function StudyPage() {
         setCards([...dueCards, ...newCards]);
         setLoading(false);
       });
-  }, [novelId, count]);
+  }, [novelId, count, storageKey]);
 
+  // On mount: rehydrate from sessionStorage if a valid snapshot exists; otherwise fetch fresh
   useEffect(() => {
-    loadCards();
-  }, [loadCards]);
+    const saved = readSavedSession(storageKey);
+    if (saved) {
+      setCards(saved.cards);
+      setCurrent(saved.current);
+      setRevealed(saved.revealed);
+      setStats(saved.stats);
+      requeueCount.current = new Map(saved.requeueCount);
+      setSessionDone(saved.sessionDone);
+      setLoading(false);
+    } else {
+      loadCards();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const advance = useCallback(
     (updatedCards: SessionCard[], nextIndex: number) => {

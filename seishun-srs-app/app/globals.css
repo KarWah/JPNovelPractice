@@ -49,6 +49,28 @@ body {
   .pager-btn:hover { background-color: #27272a; }
 }
 
+/* Range input — restore thumb on iOS Safari (appearance-none removes it) */
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 9999px;
+  background: #4f46e5;
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 9999px;
+  background: #4f46e5;
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
 /* Ruby/furigana rendering */
 ruby {
   ruby-align: center;
@@ -56,5 +78,5 @@ ruby {
 
 rt {
   font-size: 0.55em;
-  color: #6b7280;
+  color: #e4e4e7;
 }

@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 type ScrapeStatus = "idle" | "scraping" | "done" | "error";
+// Tracks which sub-phase the scraping screen is in
+type ScrapePhase = "collecting" | "importing";
 
 interface ProgressEvent {
   type: "progress" | "done" | "complete" | "error";
@@ -19,14 +21,15 @@ interface ProgressEvent {
 export default function NewNovelForm() {
   const router = useRouter();
 
-  const [url, setUrl]         = useState("");
-  const [title, setTitle]     = useState("");
+  const [url, setUrl]             = useState("");
+  const [title, setTitle]         = useState("");
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [autoBlacklist, setAutoBlacklist] = useState(true);
-  const [status, setStatus]   = useState<ScrapeStatus>("idle");
-  const [scraped, setScraped] = useState(0);
-  const [total, setTotal]     = useState<number | null>(null);
-  const [errorMsg, setErrorMsg] = useState("");
+  const [status, setStatus]       = useState<ScrapeStatus>("idle");
+  const [phase, setPhase]         = useState<ScrapePhase>("collecting");
+  const [scraped, setScraped]     = useState(0);
+  const [total, setTotal]         = useState<number | null>(null);
+  const [errorMsg, setErrorMsg]   = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
   /** Derive a URL-safe slug from the novel title */
@@ -38,21 +41,34 @@ export default function NewNovelForm() {
     if (!url || !title) return;
 
     const slug = slugify(title);
-    setStatus("scraping");
-    setScraped(0);
 
     try {
+      // Fire the request first — if the route returns a non-2xx (e.g. 409 slug conflict)
+      // we show the error on the form without ever entering the loading state.
       const res = await fetch("/api/novels/scrape", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url, title, slug, autoBlacklist }),
       });
 
-      if (!res.body) throw new Error("No response body");
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Failed to start scrape." }));
+        setErrorMsg(err.error ?? "Unknown error.");
+        setStatus("error");
+        return;
+      }
 
-      const reader = res.body.getReader();
+      if (!res.body) throw new Error("No response body from server.");
+
+      // Response is a streaming SSE — now it's safe to enter the loading state
+      setStatus("scraping");
+      setPhase("collecting");
+      setScraped(0);
+      setTotal(null);
+
+      const reader  = res.body.getReader();
       const decoder = new TextDecoder();
-      let buffer = "";
+      let buffer    = "";
 
       while (true) {
         const { done, value } = await reader.read();
@@ -70,18 +86,15 @@ export default function NewNovelForm() {
 
             if (event.type === "progress") {
               setScraped(event.scraped ?? 0);
-              if (event.total) setTotal(event.total);
             } else if (event.type === "done") {
+              // Scraping finished — DB import is starting
               setTotal(event.count ?? null);
+              setPhase("importing");
             } else if (event.type === "complete" && event.novelId) {
-              // Upload cover if one was selected
               if (coverFile) {
                 const form = new FormData();
                 form.append("cover", coverFile);
-                await fetch(`/api/novels/${event.novelId}/cover`, {
-                  method: "POST",
-                  body: form,
-                });
+                await fetch(`/api/novels/${event.novelId}/cover`, { method: "POST", body: form });
               }
               setStatus("done");
               setTimeout(() => router.push(`/novel/${event.novelId}`), 1200);
@@ -92,7 +105,7 @@ export default function NewNovelForm() {
               return;
             }
           } catch {
-            // Malformed line — skip
+            // Incomplete or non-JSON line — ignore
           }
         }
       }
@@ -101,8 +114,6 @@ export default function NewNovelForm() {
       setStatus("error");
     }
   };
-
-  const progressPct = total ? Math.min(100, Math.round((scraped / total) * 100)) : null;
 
   return (
     <div className="flex flex-col items-center min-h-screen px-4 py-12 gap-8">
@@ -210,38 +221,83 @@ export default function NewNovelForm() {
             Start scraping
           </button>
         </form>
+
       ) : status === "scraping" ? (
-        <div className="w-full max-w-lg bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-700 p-8 text-center space-y-5">
-          <h2 className="text-xl font-semibold text-zinc-800 dark:text-zinc-100">Scraping…</h2>
-          <p className="text-zinc-500 text-sm">
-            {scraped} words collected so far
-            {total ? ` (${progressPct}%)` : ""}
-          </p>
-
-          {/* Progress bar */}
-          <div className="w-full h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-            {total ? (
-              <div
-                className="h-full bg-indigo-500 rounded-full transition-all duration-500"
-                style={{ width: `${progressPct}%` }}
-              />
-            ) : (
-              <div className="h-full bg-indigo-400 rounded-full animate-pulse w-1/3" />
-            )}
-          </div>
-
-          <p className="text-xs text-zinc-400">
-            JPDB requires a polite 1.5 s delay between pages — this may take a minute or two.
-          </p>
+        <div className="w-full max-w-lg bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-700 p-8 text-center space-y-6">
+          {phase === "collecting" ? (
+            <>
+              <SpinnerRing />
+              <div>
+                <h2 className="text-xl font-semibold text-zinc-800 dark:text-zinc-100 mb-1">
+                  Collecting vocabulary…
+                </h2>
+                <p className="text-zinc-400 text-sm">Scraping pages from JPDB</p>
+              </div>
+              <div className="py-2">
+                <p className="text-5xl font-bold text-indigo-600 dark:text-indigo-400 tabular-nums">
+                  {scraped.toLocaleString()}
+                </p>
+                <p className="text-sm text-zinc-400 mt-1">words found so far</p>
+              </div>
+              <p className="text-xs text-zinc-400">
+                JPDB requires a 1.5 s delay between pages — this may take a couple of minutes.
+              </p>
+            </>
+          ) : (
+            <>
+              <SpinnerRing />
+              <div>
+                <h2 className="text-xl font-semibold text-zinc-800 dark:text-zinc-100 mb-1">
+                  Importing into database…
+                </h2>
+                <p className="text-zinc-400 text-sm">
+                  Writing {total?.toLocaleString() ?? "…"} words — almost done
+                </p>
+              </div>
+              <p className="text-xs text-zinc-400">
+                Running cross-novel checks and enrichment lookups.
+              </p>
+            </>
+          )}
         </div>
+
       ) : (
         /* done */
         <div className="w-full max-w-lg bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-700 p-8 text-center space-y-4">
           <p className="text-4xl">✓</p>
           <h2 className="text-xl font-semibold text-zinc-800 dark:text-zinc-100">Import complete!</h2>
-          <p className="text-zinc-500 text-sm">{total} words imported. Redirecting to the novel dashboard…</p>
+          <p className="text-zinc-500 text-sm">
+            {total?.toLocaleString() ?? "All"} words imported. Redirecting to the novel dashboard…
+          </p>
         </div>
       )}
+    </div>
+  );
+}
+
+function SpinnerRing() {
+  return (
+    <div className="flex justify-center">
+      <svg
+        className="animate-spin text-indigo-500"
+        width="48"
+        height="48"
+        viewBox="0 0 48 48"
+        fill="none"
+      >
+        <circle
+          cx="24" cy="24" r="20"
+          stroke="currentColor"
+          strokeWidth="4"
+          strokeOpacity="0.2"
+        />
+        <path
+          d="M44 24a20 20 0 0 0-20-20"
+          stroke="currentColor"
+          strokeWidth="4"
+          strokeLinecap="round"
+        />
+      </svg>
     </div>
   );
 }

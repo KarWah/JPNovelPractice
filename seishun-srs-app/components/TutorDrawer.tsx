@@ -31,6 +31,9 @@ export default function TutorDrawer({ vocabContext }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Clear chat history when the word changes
+  useEffect(() => { setMessages([]); }, [vocabContext?.word]);
+
   // Scroll to bottom when messages change
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -41,8 +44,8 @@ export default function TutorDrawer({ vocabContext }: Props) {
     if (open) setTimeout(() => inputRef.current?.focus(), 50);
   }, [open]);
 
-  const send = useCallback(async () => {
-    const question = input.trim();
+  const send = useCallback(async (directQuestion?: string) => {
+    const question = (directQuestion ?? input).trim();
     if (!question || loading) return;
 
     setInput("");
@@ -194,10 +197,7 @@ export default function TutorDrawer({ vocabContext }: Props) {
               {QUICK_QUESTIONS(vocabContext.word).map((q) => (
                 <button
                   key={q}
-                  onClick={() => {
-                    setInput(q);
-                    setTimeout(() => send(), 0);
-                  }}
+                  onClick={() => send(q)}
                   className="text-xs px-2.5 py-1.5 rounded-full border border-indigo-200 dark:border-indigo-700 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"
                 >
                   {q}
@@ -257,7 +257,7 @@ export default function TutorDrawer({ vocabContext }: Props) {
               className="flex-1 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 px-4 py-2.5 text-sm text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 disabled:opacity-50"
             />
             <button
-              onClick={send}
+              onClick={() => send()}
               disabled={!input.trim() || loading}
               aria-label="Send"
               className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 dark:disabled:bg-indigo-800 text-white rounded-xl transition-colors font-medium text-sm"
@@ -301,7 +301,7 @@ function AssistantMessage({ content, streaming }: { content: string; streaming?:
                 em: ({ children }) => <em className="italic">{children}</em>,
                 code: ({ className, children }) => {
                   const isInline = !className;
-                  return isInline 
+                  return isInline
                     ? <code className="bg-zinc-200 dark:bg-zinc-700 px-1 rounded text-xs">{children}</code>
                     : <code className={className}>{children}</code>;
                 },
@@ -309,6 +309,26 @@ function AssistantMessage({ content, streaming }: { content: string; streaming?:
                 h1: ({ children }) => <h1 className="text-lg font-bold mb-2">{children}</h1>,
                 h2: ({ children }) => <h2 className="text-md font-semibold mb-1">{children}</h2>,
                 h3: ({ children }) => <h3 className="text-sm font-semibold mb-1">{children}</h3>,
+                // The AI formats furigana as [Kanji](reading) which is also valid Markdown link
+                // syntax. Any href that isn't a real http(s) URL is a furigana annotation —
+                // render it as <ruby> rather than a navigable link.
+                a: ({ href, children }) => {
+                  const isRealUrl = href && (href.startsWith("http://") || href.startsWith("https://"));
+                  if (!isRealUrl) {
+                    const reading = href ? decodeURIComponent(href) : "";
+                    return (
+                      <ruby>
+                        {children}
+                        <rt className="text-[10px] text-zinc-500 dark:text-zinc-400">{reading}</rt>
+                      </ruby>
+                    );
+                  }
+                  return (
+                    <a href={href} target="_blank" rel="noopener noreferrer" className="text-indigo-500 underline">
+                      {children}
+                    </a>
+                  );
+                },
               }}
             >
               {part}

@@ -5,6 +5,7 @@ import FuriganaText from "@/components/FuriganaText";
 import TutorDrawer from "@/components/TutorDrawer";
 import { JLPT_COLORS_BORDER, formatPOS, extractKanji } from "@/lib/jp";
 import { addToStudyDeck, blacklistWord, unblacklistWord } from "./actions";
+import { StartStudyButton } from "./StartStudyButton";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -36,12 +37,12 @@ export default async function VocabDetailPage({ params }: PageProps) {
   const [prevEntry, nextEntry] = await Promise.all([
     prisma.vocabEntry.findFirst({
       where: { occurrences: { gt: entry.occurrences } },
-      orderBy: { occurrences: "asc" },
+      orderBy: [{ occurrences: "asc" }, { id: "asc" }],
       select: { id: true, kanji: true, kana: true },
     }),
     prisma.vocabEntry.findFirst({
       where: { occurrences: { lt: entry.occurrences } },
-      orderBy: { occurrences: "desc" },
+      orderBy: [{ occurrences: "desc" }, { id: "desc" }],
       select: { id: true, kanji: true, kana: true },
     }),
   ]);
@@ -67,7 +68,10 @@ export default async function VocabDetailPage({ params }: PageProps) {
           Dashboard
         </Link>
         <span>/</span>
-        <Link href="/vocab" className="hover:text-zinc-600 transition-colors">
+        <Link
+          href={entry.novelId ? `/vocab?novelId=${entry.novelId}` : "/vocab"}
+          className="hover:text-zinc-600 transition-colors"
+        >
           Vocabulary
         </Link>
         <span>/</span>
@@ -262,7 +266,7 @@ export default async function VocabDetailPage({ params }: PageProps) {
             <p className="text-sm text-zinc-400">Not yet added to study deck.</p>
             <div className="flex gap-2">
               <BlacklistButton vocabId={entry.id} />
-              <StartStudyButton vocabId={entry.id} />
+              <StartStudyButton action={addToStudyDeck.bind(null, entry.id)} />
             </div>
           </div>
         )}
@@ -388,18 +392,7 @@ function Stat({
   );
 }
 
-function StartStudyButton({ vocabId }: { vocabId: number }) {
-  return (
-    <form action={addToStudyDeck.bind(null, vocabId)}>
-      <button
-        type="submit"
-        className="px-4 py-2 text-sm rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition-colors font-medium"
-      >
-        Add to study deck
-      </button>
-    </form>
-  );
-}
+// StartStudyButton is defined in ./StartStudyButton.tsx (client component for useFormStatus)
 
 function BlacklistButton({ vocabId }: { vocabId: number }) {
   return (

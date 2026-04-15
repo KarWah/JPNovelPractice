@@ -30,6 +30,16 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: "URL must be a jpdb.io URL" }, { status: 400 });
   }
 
+  // Check for slug conflict before starting the scrape — returns a plain JSON error
+  // so the client can display it on the form without entering the loading state.
+  const existing = await prisma.novel.findUnique({ where: { slug }, select: { id: true, title: true } });
+  if (existing) {
+    return Response.json(
+      { error: `A novel with this title already exists (slug "${slug}" is taken). Please use a different title.` },
+      { status: 409 }
+    );
+  }
+
   const tmpOutput = join(tmpdir(), `jpdb_${slug}_${Date.now()}.json`);
 
   const stream = new ReadableStream({
@@ -40,7 +50,6 @@ export async function POST(req: NextRequest) {
 
       const child = spawn("python", [SCRAPE_SCRIPT, "--url", url, "--output", tmpOutput], {
         env: { ...process.env, PYTHONIOENCODING: "utf-8" },
-        shell: true,
       });
 
       let errorBuf = "";

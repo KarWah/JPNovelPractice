@@ -33,6 +33,6 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Network-first for all requests to avoid stale content issues
-  event.respondWith(fetch(request));
+  // Network-first with cache fallback so pre-cached pages work offline
+  event.respondWith(fetch(request).catch(() => caches.match(request)));
 });

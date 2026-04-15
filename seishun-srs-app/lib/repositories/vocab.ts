@@ -26,13 +26,7 @@ export async function getNovelStats(novelId: number): Promise<NovelStats> {
   ]);
 
   const learnedIds = await getLearnedVocabIds(novelId);
-  const newAvailableCount = await prisma.vocabEntry.count({
-    where: {
-      novelId,
-      blacklisted: false,
-      id: { notIn: learnedIds.length ? learnedIds : [-1] },
-    },
-  });
+  const newAvailableCount = await getNewWordsCount(novelId, learnedIds);
 
   return {
     totalVocab,
@@ -97,19 +91,30 @@ export async function getReviewQueue(novelId: number, count: number): Promise<Re
 
 export async function getNewWords(
   novelId: number,
-  limit: number
+  limit: number,
+  learnedIds?: number[]
 ): Promise<VocabCardEntry[]> {
-  const learnedIds = await getLearnedVocabIds(novelId);
+  const ids = learnedIds ?? await getLearnedVocabIds(novelId);
   return prisma.vocabEntry.findMany({
     where: {
       novelId,
       blacklisted: false,
-      id: { notIn: learnedIds.length ? learnedIds : [-1] },
+      id: { notIn: ids.length ? ids : [-1] },
     },
     orderBy: { occurrences: "desc" },
     take: limit,
     include: { sentences: true },
   }) as unknown as VocabCardEntry[];
+}
+
+async function getNewWordsCount(novelId: number, learnedIds: number[]): Promise<number> {
+  return prisma.vocabEntry.count({
+    where: {
+      novelId,
+      blacklisted: false,
+      id: { notIn: learnedIds.length ? learnedIds : [-1] },
+    },
+  });
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

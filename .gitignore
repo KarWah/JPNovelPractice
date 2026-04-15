@@ -5,10 +5,10 @@
 /seishun-srs-app/.pnp
 /seishun-srs-app/.pnp.*
 /seishun-srs-app/.yarn/*
-/seishun-srs-app/!.yarn/patches
-/seishun-srs-app/!.yarn/plugins
-/seishun-srs-app/!.yarn/releases
-/seishun-srs-app/!.yarn/versions
+!/seishun-srs-app/.yarn/patches
+!/seishun-srs-app/.yarn/plugins
+!/seishun-srs-app/.yarn/releases
+!/seishun-srs-app/.yarn/versions
 
 # testing
 /seishun-srs-app/coverage
@@ -39,10 +39,17 @@
 # typescript
 /seishun-srs-app/*.tsbuildinfo
 /seishun-srs-app/next-env.d.ts
-scrape_oldpy.py
+scrape_old.py
 seishun-srs-app/public/assets/bunny_vol_2.webp
 .claude/settings.local.json
 .env
+seishun-srs-app/AGENTS.md
 seishun-srs-app/CLAUDE.md
-scripts/.cache/jmdict-eng.json
-scripts/.cache/jmdict-examples-eng.json
+
+# python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# jmdict enrichment cache (downloaded at runtime)
+scripts/.cache/

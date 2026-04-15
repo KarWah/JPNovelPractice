@@ -49,6 +49,18 @@ export default async function VocabPage({ searchParams }: PageProps) {
     where.progress = { nextReviewDate: { lte: now } };
   }
 
+  // Only offer JLPT filter buttons for levels that actually have data
+  const jlptLevelRows = await prisma.vocabEntry.groupBy({
+    by: ["jlptLevel"],
+    where: { ...(novelId ? { novelId } : {}), jlptLevel: { not: null } },
+  });
+  const availableJlpt = jlptLevelRows
+    .map((r) => r.jlptLevel as string)
+    .sort((a, b) => {
+      const order = ["N5", "N4", "N3", "N2", "N1"];
+      return order.indexOf(a) - order.indexOf(b);
+    });
+
   const [entries, total] = await Promise.all([
     prisma.vocabEntry.findMany({
       where,
@@ -89,7 +101,7 @@ export default async function VocabPage({ searchParams }: PageProps) {
       {/* Filters — needs Suspense for useSearchParams */}
       <div className="mb-6">
         <Suspense fallback={<div className="h-20 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded-xl" />}>
-          <VocabFilters total={total} />
+          <VocabFilters total={total} availableJlpt={availableJlpt} />
         </Suspense>
       </div>
 

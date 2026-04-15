@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { writeFileSync } from "fs";
+import { writeFile } from "fs/promises";
 import { join, extname } from "path";
 import { prisma } from "@/lib/prisma";
 
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 
   const filename = `${novel.slug}${ext}`;
   const destPath = join(process.cwd(), "public", "assets", filename);
-  writeFileSync(destPath, Buffer.from(bytes));
+  await writeFile(destPath, Buffer.from(bytes));
 
   const coverImage = `assets/${filename}`;
   await prisma.novel.update({

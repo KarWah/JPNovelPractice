@@ -4,29 +4,34 @@ import StatCard from "@/components/StatCard";
 
 export const dynamic = "force-dynamic";
 
+// Format a Date as YYYY-MM-DD in local time
+function localDateKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 async function getAnalytics() {
   const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const todayKey = localDateKey(now);
 
-  // Last 7 days of review counts
-  const sevenDaysAgo = new Date(today);
+  // Last 7 days of review counts — go back 6 days from today (local time)
+  const sevenDaysAgo = new Date(now);
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+  sevenDaysAgo.setHours(0, 0, 0, 0);
 
   const recentLogs = await prisma.reviewLog.findMany({
     where: { reviewedAt: { gte: sevenDaysAgo } },
     select: { reviewedAt: true, grade: true },
   });
 
-  // Bucket by day
+  // Build dayMap keyed by local date string
   const dayMap = new Map<string, { total: number; correct: number }>();
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - (6 - i));
-    const key = d.toISOString().slice(0, 10);
-    dayMap.set(key, { total: 0, correct: 0 });
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    dayMap.set(localDateKey(d), { total: 0, correct: 0 });
   }
   for (const log of recentLogs) {
-    const key = log.reviewedAt.toISOString().slice(0, 10);
+    const key = localDateKey(log.reviewedAt);
     if (dayMap.has(key)) {
       const entry = dayMap.get(key)!;
       entry.total++;
@@ -43,15 +48,6 @@ async function getAnalytics() {
     ...data,
   }));
 
-  // JLPT breakdown of learned words
-  const jlptRows = await prisma.$queryRaw<{ level: string; count: bigint }[]>`
-    SELECT v."jlptLevel" as level, COUNT(*) as count
-    FROM "UserProgress" up
-    JOIN "VocabEntry" v ON v.id = up."vocabId"
-    GROUP BY v."jlptLevel"
-    ORDER BY v."jlptLevel"
-  `;
-
   // Overall stats
   const [totalLearned, totalVocab, totalBlacklisted, allTimeReviews] = await Promise.all([
     prisma.userProgress.count(),
@@ -60,18 +56,20 @@ async function getAnalytics() {
     prisma.reviewLog.count(),
   ]);
 
-  // Streak: count consecutive days (from today going backwards) that have at least one review
+  // Streak: count consecutive local days going backwards with at least one review.
+  // Start from yesterday if today has no reviews yet, so a pre-review check doesn't
+  // break a streak that ended yesterday.
   const logsWithDates = await prisma.reviewLog.findMany({
     select: { reviewedAt: true },
     orderBy: { reviewedAt: "desc" },
   });
-  const reviewedDays = new Set(logsWithDates.map((l) => l.reviewedAt.toISOString().slice(0, 10)));
+  const reviewedDays = new Set(logsWithDates.map((l) => localDateKey(l.reviewedAt)));
+  const startFrom = reviewedDays.has(todayKey) ? 0 : 1;
   let streak = 0;
-  for (let i = 0; ; i++) {
-    const d = new Date(today);
+  for (let i = startFrom; ; i++) {
+    const d = new Date(now);
     d.setDate(d.getDate() - i);
-    const key = d.toISOString().slice(0, 10);
-    if (reviewedDays.has(key)) {
+    if (reviewedDays.has(localDateKey(d))) {
       streak++;
     } else {
       break;
@@ -80,7 +78,7 @@ async function getAnalytics() {
 
   return {
     dailyReviews,
-    jlptRows: jlptRows.map((r) => ({ level: r.level ?? "Unknown", count: Number(r.count) })),
+    todayKey,
     totalLearned,
     totalVocab,
     totalBlacklisted,
@@ -93,13 +91,7 @@ export default async function AnalyticsPage() {
   const data = await getAnalytics();
 
   const maxDaily = Math.max(...data.dailyReviews.map((d) => d.total), 1);
-  const todayReviews = data.dailyReviews[data.dailyReviews.length - 1]?.total ?? 0;
-
-  const JLPT_ORDER = ["N5", "N4", "N3", "N2", "N1", "Unknown"];
-  const jlptSorted = [...data.jlptRows].sort(
-    (a, b) => JLPT_ORDER.indexOf(a.level) - JLPT_ORDER.indexOf(b.level)
-  );
-  const maxJlpt = Math.max(...jlptSorted.map((r) => r.count), 1);
+  const todayReviews = data.dailyReviews.find((d) => d.date === data.todayKey)?.total ?? 0;
 
   return (
     <div className="flex flex-col items-center min-h-screen px-4 py-12 gap-8">
@@ -146,7 +138,7 @@ export default async function AnalyticsPage() {
         <div className="flex items-end gap-2 h-28">
           {data.dailyReviews.map((day) => {
             const heightPct = day.total > 0 ? (day.total / maxDaily) * 100 : 0;
-            const isToday = day.date === new Date().toISOString().slice(0, 10);
+            const isToday = day.date === data.todayKey;
             return (
               <div key={day.date} className="flex flex-col items-center gap-1 flex-1">
                 <span className="text-xs text-zinc-400">{day.total > 0 ? day.total : ""}</span>
@@ -171,42 +163,6 @@ export default async function AnalyticsPage() {
         </div>
       </div>
 
-      {/* JLPT breakdown */}
-      {jlptSorted.length > 0 && (
-        <div className="w-full max-w-lg bg-white dark:bg-zinc-900 rounded-xl p-6 shadow-sm border border-zinc-200 dark:border-zinc-700">
-          <h2 className="text-sm font-semibold text-zinc-500 uppercase tracking-wide mb-4">
-            Learned words by JLPT level
-          </h2>
-          <div className="space-y-3">
-            {jlptSorted.map((row) => {
-              const pct = Math.round((row.count / maxJlpt) * 100);
-              const colorMap: Record<string, string> = {
-                N5: "bg-green-400",
-                N4: "bg-lime-400",
-                N3: "bg-yellow-400",
-                N2: "bg-orange-400",
-                N1: "bg-red-400",
-                Unknown: "bg-zinc-400",
-              };
-              const bar = colorMap[row.level] ?? "bg-zinc-400";
-              return (
-                <div key={row.level} className="flex items-center gap-3">
-                  <span className="text-sm font-semibold text-zinc-600 dark:text-zinc-300 w-12">
-                    {row.level}
-                  </span>
-                  <div className="flex-1 h-4 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all ${bar}`}
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                  <span className="text-sm text-zinc-500 w-10 text-right">{row.count}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
