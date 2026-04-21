@@ -181,6 +181,16 @@ def extract_info(jm_entry: dict) -> dict:
     }
 
 
+def _prefer_common(candidates: list, search_text: str, form_key: str) -> list:
+    """Narrow candidates to those where search_text appears as a common form."""
+    common = [
+        e for e in candidates
+        if any(f["text"] == search_text and f.get("common", False)
+               for f in e.get(form_key, []))
+    ]
+    return common if common else candidates
+
+
 def find_best_match(kanji, kana, by_kanji, by_kana):
     candidates = []
 
@@ -193,10 +203,14 @@ def find_best_match(kanji, kana, by_kanji, by_kana):
             ]
             if filtered:
                 candidates = filtered
+        if len(candidates) > 1:
+            candidates = _prefer_common(candidates, kanji, "kanji")
 
     if not candidates:
         # kana field may contain kanji (e.g. "言う") — try kanji index first
         candidates = by_kanji.get(kana, [])
+        if len(candidates) > 1:
+            candidates = _prefer_common(candidates, kana, "kanji")
 
     if not candidates:
         candidates = by_kana.get(kana, [])
@@ -209,6 +223,8 @@ def find_best_match(kanji, kana, by_kanji, by_kana):
                        if e.get("kana", [{}])[0].get("text") == kana]
             if primary:
                 candidates = primary
+        if len(candidates) > 1:
+            candidates = _prefer_common(candidates, kana, "kana")
 
     return candidates[0] if candidates else None
 

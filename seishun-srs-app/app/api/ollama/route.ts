@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 
 const OLLAMA_BASE = process.env.OLLAMA_BASE_URL ?? "http://localhost:11434";
-const MODEL = "gemma4:e2b";
+const MODEL = "simmer-gemma";
 
 // POST /api/ollama
 // Body: { question: string, vocabContext: { kanji, kana, meaning } }
