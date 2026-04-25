@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { getDbForRequest } from "@/lib/auth";
 
 export async function GET(
   req: NextRequest,
@@ -12,7 +12,8 @@ export async function GET(
     return Response.json({ error: "Invalid id" }, { status: 400 });
   }
 
-  const entry = await prisma.vocabEntry.findUnique({
+  const db = getDbForRequest(req);
+  const entry = await db.vocabEntry.findUnique({
     where: { id: vocabId },
     select: {
       kanji: true,

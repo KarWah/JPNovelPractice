@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { getDb, isAdmin } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import FuriganaText from "@/components/FuriganaText";
@@ -16,7 +16,9 @@ export default async function VocabDetailPage({ params }: PageProps) {
   const entryId = parseInt(id);
   if (isNaN(entryId)) notFound();
 
-  const entry = await prisma.vocabEntry.findUnique({
+  const [db, admin] = await Promise.all([getDb(), isAdmin()]);
+
+  const entry = await db.vocabEntry.findUnique({
     where: { id: entryId },
     include: {
       sentences: true,
@@ -28,19 +30,19 @@ export default async function VocabDetailPage({ params }: PageProps) {
 
   // Fetch kanji breakdown for every kanji character in the word
   const kanjiChars = extractKanji(entry.kanji ?? entry.kana);
-  const kanjiData = await prisma.kanjiEntry.findMany({
+  const kanjiData = await db.kanjiEntry.findMany({
     where: { character: { in: kanjiChars } },
   });
   const kanjiMap = Object.fromEntries(kanjiData.map((k) => [k.character, k]));
 
   // Neighbouring words for prev/next navigation
   const [prevEntry, nextEntry] = await Promise.all([
-    prisma.vocabEntry.findFirst({
+    db.vocabEntry.findFirst({
       where: { occurrences: { gt: entry.occurrences } },
       orderBy: [{ occurrences: "asc" }, { id: "asc" }],
       select: { id: true, kanji: true, kana: true },
     }),
-    prisma.vocabEntry.findFirst({
+    db.vocabEntry.findFirst({
       where: { occurrences: { lt: entry.occurrences } },
       orderBy: [{ occurrences: "desc" }, { id: "desc" }],
       select: { id: true, kanji: true, kana: true },
@@ -254,20 +256,24 @@ export default async function VocabDetailPage({ params }: PageProps) {
         {entry.blacklisted ? (
           <div className="flex items-center justify-between">
             <p className="text-sm text-zinc-400">Marked as already known — excluded from reviews.</p>
-            <UnblacklistButton vocabId={entry.id} />
+            {admin && <UnblacklistButton vocabId={entry.id} />}
           </div>
         ) : entry.progress ? (
           <div className="space-y-4">
             <SRSProgress progress={entry.progress} />
-            <BlacklistButton vocabId={entry.id} />
+            {admin && <BlacklistButton vocabId={entry.id} />}
           </div>
         ) : (
           <div className="flex items-center justify-between">
-            <p className="text-sm text-zinc-400">Not yet added to study deck.</p>
-            <div className="flex gap-2">
-              <BlacklistButton vocabId={entry.id} />
-              <StartStudyButton action={addToStudyDeck.bind(null, entry.id)} />
-            </div>
+            <p className="text-sm text-zinc-400">
+              {admin ? "Not yet added to study deck." : "Demo mode — sign in to track progress."}
+            </p>
+            {admin && (
+              <div className="flex gap-2">
+                <BlacklistButton vocabId={entry.id} />
+                <StartStudyButton action={addToStudyDeck.bind(null, entry.id)} />
+              </div>
+            )}
           </div>
         )}
       </Section>

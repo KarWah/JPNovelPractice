@@ -17,9 +17,10 @@ export interface NovelGridItem {
 
 interface Props {
   initialNovels: NovelGridItem[];
+  isAdmin?: boolean;
 }
 
-export default function NovelGrid({ initialNovels }: Props) {
+export default function NovelGrid({ initialNovels, isAdmin = false }: Props) {
   const [novels, setNovels]         = useState(initialNovels);
   const [dragSrcId, setDragSrcId]   = useState<number | null>(null);
   const [dragOverId, setDragOverId] = useState<number | null>(null);
@@ -151,11 +152,11 @@ export default function NovelGrid({ initialNovels }: Props) {
         return (
           <div
             key={novel.id}
-            draggable
-            onDragStart={(e) => onDragStart(e, novel.id)}
-            onDragOver={(e)  => onDragOver(e,  novel.id)}
-            onDrop={(e)      => onDrop(e,      novel.id)}
-            onDragEnd={onDragEnd}
+            draggable={isAdmin}
+            onDragStart={(e) => isAdmin && onDragStart(e, novel.id)}
+            onDragOver={(e)  => isAdmin && onDragOver(e,  novel.id)}
+            onDrop={(e)      => isAdmin && onDrop(e,      novel.id)}
+            onDragEnd={() => isAdmin && onDragEnd()}
             className={[
               "group relative bg-white dark:bg-zinc-900 rounded-2xl border overflow-hidden shadow transition-all duration-200",
               isDragging    ? "opacity-40 scale-95 border-indigo-300 dark:border-indigo-600"           : "",
@@ -163,9 +164,8 @@ export default function NovelGrid({ initialNovels }: Props) {
               !isDragging && !isDropTarget ? "hover:shadow-lg hover:border-indigo-300 dark:hover:border-indigo-700" : "",
             ].join(" ")}
           >
-            {/* ── Management overlay (drag / rename / trash) ── */}
-            {/* pointer-events-none on mobile (no hover) to avoid eating taps */}
-            <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-2 py-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none [@media(hover:hover)]:group-hover:pointer-events-auto">
+            {/* ── Management overlay (drag / rename / trash) — admin only ── */}
+            <div className={`absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-2 py-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none [@media(hover:hover)]:group-hover:pointer-events-auto ${!isAdmin ? "hidden" : ""}`}>
               {/* Drag handle */}
               <div
                 className="cursor-grab active:cursor-grabbing p-1.5 rounded-lg bg-black/40 text-white backdrop-blur-sm select-none"
@@ -290,18 +290,32 @@ export default function NovelGrid({ initialNovels }: Props) {
         );
       })}
 
-      {/* Add novel tile */}
-      <Link
-        href="/novels/new"
-        className="group relative bg-white dark:bg-zinc-900 rounded-2xl border-2 border-dashed border-zinc-200 dark:border-zinc-700 hover:border-indigo-300 dark:hover:border-indigo-600 overflow-hidden transition-all duration-200 flex flex-col items-center justify-center gap-3 min-h-[280px]"
-      >
-        <div className="text-4xl text-zinc-300 dark:text-zinc-600 group-hover:text-indigo-400 transition-colors">
-          +
-        </div>
-        <p className="text-sm font-medium text-zinc-400 dark:text-zinc-500 group-hover:text-indigo-500 transition-colors">
-          Add novel
-        </p>
-      </Link>
+      {/* Add novel tile (admin) / Login prompt (visitor) */}
+      {isAdmin ? (
+        <Link
+          href="/novels/new"
+          className="group relative bg-white dark:bg-zinc-900 rounded-2xl border-2 border-dashed border-zinc-200 dark:border-zinc-700 hover:border-indigo-300 dark:hover:border-indigo-600 overflow-hidden transition-all duration-200 flex flex-col items-center justify-center gap-3 min-h-[280px]"
+        >
+          <div className="text-4xl text-zinc-300 dark:text-zinc-600 group-hover:text-indigo-400 transition-colors">
+            +
+          </div>
+          <p className="text-sm font-medium text-zinc-400 dark:text-zinc-500 group-hover:text-indigo-500 transition-colors">
+            Add novel
+          </p>
+        </Link>
+      ) : (
+        <Link
+          href="/login"
+          className="group relative bg-white dark:bg-zinc-900 rounded-2xl border-2 border-dashed border-zinc-200 dark:border-zinc-700 hover:border-indigo-300 dark:hover:border-indigo-600 overflow-hidden transition-all duration-200 flex flex-col items-center justify-center gap-3 min-h-[280px]"
+        >
+          <div className="text-3xl text-zinc-300 dark:text-zinc-600 group-hover:text-indigo-400 transition-colors">
+            🔒
+          </div>
+          <p className="text-sm font-medium text-zinc-400 dark:text-zinc-500 group-hover:text-indigo-500 transition-colors text-center px-4">
+            Admin login
+          </p>
+        </Link>
+      )}
     </div>
   );
 }

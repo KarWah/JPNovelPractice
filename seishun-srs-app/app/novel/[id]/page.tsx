@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { getDb, isAdmin } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -14,12 +14,13 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-async function NovelDashboardContent({ novelId }: { novelId: number }) {
+async function NovelDashboardContent({ novelId, admin }: { novelId: number; admin: boolean }) {
   try {
+    const db = await getDb();
     const [novel, stats, otherNovelProgress] = await Promise.all([
-      prisma.novel.findUnique({ where: { id: novelId } }),
-      getNovelStats(novelId),
-      prisma.userProgress.count({ where: { vocab: { novelId: { not: novelId } } } }),
+      db.novel.findUnique({ where: { id: novelId } }),
+      getNovelStats(novelId, db),
+      db.userProgress.count({ where: { vocab: { novelId: { not: novelId } } } }),
     ]);
 
     if (!novel) return <div>Novel not found</div>;
@@ -61,7 +62,7 @@ async function NovelDashboardContent({ novelId }: { novelId: number }) {
         </div>
 
         {/* Cross-novel setup (shown when starting a new novel with prior known words) */}
-        {isNewNovel && hasKnownFromOtherNovels && (
+        {admin && isNewNovel && hasKnownFromOtherNovels && (
           <CrossNovelSetup novelId={novelId} />
         )}
 
@@ -80,13 +81,21 @@ async function NovelDashboardContent({ novelId }: { novelId: number }) {
           </div>
         </div>
 
-        {/* Session starter with slider */}
-        <div className="w-full max-w-lg bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-700 p-6 shadow-sm">
-          <h2 className="text-sm font-semibold text-zinc-500 uppercase tracking-wide mb-4">
-            Start a session
-          </h2>
-          <SessionStarter novelId={novelId} maxAvailable={maxSessionCards} />
-        </div>
+        {/* Session starter with slider (admin only — requires UserProgress writes) */}
+        {admin ? (
+          <div className="w-full max-w-lg bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-700 p-6 shadow-sm">
+            <h2 className="text-sm font-semibold text-zinc-500 uppercase tracking-wide mb-4">
+              Start a session
+            </h2>
+            <SessionStarter novelId={novelId} maxAvailable={maxSessionCards} />
+          </div>
+        ) : (
+          <div className="w-full max-w-lg bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-200 dark:border-zinc-700 p-6 text-center">
+            <p className="text-sm text-zinc-400">
+              This is a demo — study sessions are disabled for visitors.
+            </p>
+          </div>
+        )}
 
         {/* Secondary actions */}
         <div className="w-full max-w-lg flex flex-col gap-3">
@@ -104,8 +113,8 @@ async function NovelDashboardContent({ novelId }: { novelId: number }) {
           </Link>
         </div>
 
-        {/* Advanced: manual cross-novel blacklist re-check */}
-        <CrossNovelSetup novelId={novelId} showAsButton />
+        {/* Advanced: manual cross-novel blacklist re-check (admin only) */}
+        {admin && <CrossNovelSetup novelId={novelId} showAsButton />}
       </>
     );
   } catch (e) {
@@ -133,10 +142,12 @@ export default async function NovelDashboard({ params }: PageProps) {
   const novelId = parseInt(id);
   if (isNaN(novelId)) notFound();
 
+  const admin = await isAdmin();
+
   return (
     <div className="flex flex-col items-center min-h-screen px-4 py-10 gap-8">
       <Suspense fallback={<LoadingContent />}>
-        <NovelDashboardContent novelId={novelId} />
+        <NovelDashboardContent novelId={novelId} admin={admin} />
       </Suspense>
     </div>
   );

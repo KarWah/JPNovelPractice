@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { getDb, isAdmin } from "@/lib/auth";
 import NovelGrid from "@/components/NovelGrid";
 import type { NovelGridItem } from "@/components/NovelGrid";
 import { getNovelSummary } from "@/lib/repositories/vocab";
@@ -6,14 +6,16 @@ import { getNovelSummary } from "@/lib/repositories/vocab";
 export const dynamic = "force-dynamic";
 
 export default async function LandingPage() {
-  const novels = await prisma.novel.findMany({
+  const [db, admin] = await Promise.all([getDb(), isAdmin()]);
+
+  const novels = await db.novel.findMany({
     orderBy: { sortOrder: "asc" },
     include: {
       _count: { select: { vocabEntries: true } },
     },
   });
 
-  const summaries = await Promise.all(novels.map((n) => getNovelSummary(n.id)));
+  const summaries = await Promise.all(novels.map((n) => getNovelSummary(n.id, db)));
   const statsMap = Object.fromEntries(summaries.map((s) => [s.novelId, s]));
 
   const items: NovelGridItem[] = novels.map((novel) => {
@@ -41,7 +43,7 @@ export default async function LandingPage() {
         </p>
       </div>
 
-      <NovelGrid initialNovels={items} />
+      <NovelGrid initialNovels={items} isAdmin={admin} />
     </div>
   );
 }

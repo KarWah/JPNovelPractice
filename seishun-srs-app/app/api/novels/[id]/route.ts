@@ -1,16 +1,19 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { isAdminRequest } from "@/lib/auth";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
-// PATCH /api/novels/[id]
-// Body: { title: string }
+// PATCH /api/novels/[id] (admin only)
 export async function PATCH(req: NextRequest, { params }: RouteParams) {
+  if (!isAdminRequest(req)) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { id } = await params;
   const novelId = parseInt(id);
-
   if (isNaN(novelId)) {
     return Response.json({ error: "Invalid novel id" }, { status: 400 });
   }
@@ -29,12 +32,14 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
   return Response.json({ ok: true, novel });
 }
 
-// DELETE /api/novels/[id]
-// Removes a novel and all associated vocab, progress, review logs, and example sentences.
+// DELETE /api/novels/[id] (admin only)
 export async function DELETE(req: NextRequest, { params }: RouteParams) {
+  if (!isAdminRequest(req)) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { id } = await params;
   const novelId = parseInt(id);
-
   if (isNaN(novelId)) {
     return Response.json({ error: "Invalid novel id" }, { status: 400 });
   }
@@ -44,7 +49,6 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
     return Response.json({ error: "Novel not found" }, { status: 404 });
   }
 
-  // Collect all vocab IDs for this novel (needed to cascade manually)
   const vocabIds = (
     await prisma.vocabEntry.findMany({
       where: { novelId },
@@ -53,7 +57,6 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
   ).map((v) => v.id);
 
   if (vocabIds.length > 0) {
-    // Delete in FK dependency order
     await prisma.reviewLog.deleteMany({ where: { vocabId: { in: vocabIds } } });
     await prisma.userProgress.deleteMany({ where: { vocabId: { in: vocabIds } } });
     await prisma.exampleSentence.deleteMany({ where: { vocabId: { in: vocabIds } } });

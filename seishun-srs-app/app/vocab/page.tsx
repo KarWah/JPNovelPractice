@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { getDb } from "@/lib/auth";
 import Link from "next/link";
 import { Suspense } from "react";
 import VocabFilters from "./VocabFilters";
@@ -19,6 +19,7 @@ interface PageProps {
 
 export default async function VocabPage({ searchParams }: PageProps) {
   const sp = await searchParams;
+  const db = await getDb();
   const q = sp.q ?? "";
   const jlpt = sp.jlpt ?? "";
   const status = sp.status ?? "";
@@ -50,7 +51,7 @@ export default async function VocabPage({ searchParams }: PageProps) {
   }
 
   // Only offer JLPT filter buttons for levels that actually have data
-  const jlptLevelRows = await prisma.vocabEntry.groupBy({
+  const jlptLevelRows = await db.vocabEntry.groupBy({
     by: ["jlptLevel"],
     where: { ...(novelId ? { novelId } : {}), jlptLevel: { not: null } },
   });
@@ -62,7 +63,7 @@ export default async function VocabPage({ searchParams }: PageProps) {
     });
 
   const [entries, total] = await Promise.all([
-    prisma.vocabEntry.findMany({
+    db.vocabEntry.findMany({
       where,
       orderBy: [{ occurrences: "desc" }],
       take: PAGE_SIZE,
@@ -80,7 +81,7 @@ export default async function VocabPage({ searchParams }: PageProps) {
         },
       },
     }),
-    prisma.vocabEntry.count({ where }),
+    db.vocabEntry.count({ where }),
   ]);
 
   const totalPages = Math.ceil(total / PAGE_SIZE);

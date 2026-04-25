@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { writeFile } from "fs/promises";
 import { join, extname } from "path";
 import { prisma } from "@/lib/prisma";
+import { isAdminRequest } from "@/lib/auth";
 
 const ALLOWED_EXTS = new Set([".webp", ".jpg", ".jpeg", ".png"]);
 const MAX_BYTES = 2 * 1024 * 1024; // 2 MB
@@ -10,8 +11,12 @@ interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
-// POST /api/novels/[id]/cover — multipart/form-data, field "cover"
+// POST /api/novels/[id]/cover — multipart/form-data, field "cover" (admin only)
 export async function POST(req: NextRequest, { params }: RouteParams) {
+  if (!isAdminRequest(req)) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { id } = await params;
   const novelId = parseInt(id);
 

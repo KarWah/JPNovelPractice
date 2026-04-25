@@ -1,29 +1,27 @@
-import { prisma } from "@/lib/prisma";
+import { getDb } from "@/lib/auth";
 import Link from "next/link";
 import StatCard from "@/components/StatCard";
 
 export const dynamic = "force-dynamic";
 
-// Format a Date as YYYY-MM-DD in local time
 function localDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 async function getAnalytics() {
+  const db = await getDb();
   const now = new Date();
   const todayKey = localDateKey(now);
 
-  // Last 7 days of review counts — go back 6 days from today (local time)
   const sevenDaysAgo = new Date(now);
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
   sevenDaysAgo.setHours(0, 0, 0, 0);
 
-  const recentLogs = await prisma.reviewLog.findMany({
+  const recentLogs = await db.reviewLog.findMany({
     where: { reviewedAt: { gte: sevenDaysAgo } },
     select: { reviewedAt: true, grade: true },
   });
 
-  // Build dayMap keyed by local date string
   const dayMap = new Map<string, { total: number; correct: number }>();
   for (let i = 6; i >= 0; i--) {
     const d = new Date(now);
@@ -48,18 +46,14 @@ async function getAnalytics() {
     ...data,
   }));
 
-  // Overall stats
   const [totalLearned, totalVocab, totalBlacklisted, allTimeReviews] = await Promise.all([
-    prisma.userProgress.count(),
-    prisma.vocabEntry.count(),
-    prisma.vocabEntry.count({ where: { blacklisted: true } }),
-    prisma.reviewLog.count(),
+    db.userProgress.count(),
+    db.vocabEntry.count(),
+    db.vocabEntry.count({ where: { blacklisted: true } }),
+    db.reviewLog.count(),
   ]);
 
-  // Streak: count consecutive local days going backwards with at least one review.
-  // Start from yesterday if today has no reviews yet, so a pre-review check doesn't
-  // break a streak that ended yesterday.
-  const logsWithDates = await prisma.reviewLog.findMany({
+  const logsWithDates = await db.reviewLog.findMany({
     select: { reviewedAt: true },
     orderBy: { reviewedAt: "desc" },
   });
@@ -103,7 +97,6 @@ export default async function AnalyticsPage() {
         <p className="text-zinc-500 dark:text-zinc-400">Your study analytics</p>
       </div>
 
-      {/* Summary stats */}
       <div className="w-full max-w-lg grid grid-cols-2 gap-4">
         <StatCard label="Words learned" value={data.totalLearned} accent="indigo" />
         <StatCard label="Reviews today" value={todayReviews} accent="yellow" />
@@ -130,7 +123,6 @@ export default async function AnalyticsPage() {
         )}
       </div>
 
-      {/* 7-day review chart */}
       <div className="w-full max-w-lg bg-white dark:bg-zinc-900 rounded-xl p-6 shadow-sm border border-zinc-200 dark:border-zinc-700">
         <h2 className="text-sm font-semibold text-zinc-500 uppercase tracking-wide mb-4">
           Reviews — last 7 days
@@ -162,8 +154,6 @@ export default async function AnalyticsPage() {
           })}
         </div>
       </div>
-
     </div>
   );
 }
-

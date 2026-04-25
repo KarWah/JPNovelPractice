@@ -1,8 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 
-function createPrismaClient() {
-  const connectionString = process.env.DATABASE_URL!;
+function createClient(connectionString: string) {
   const adapter = new PrismaPg({ connectionString });
   return new PrismaClient({
     adapter,
@@ -10,10 +9,22 @@ function createPrismaClient() {
   });
 }
 
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
+const g = globalThis as unknown as {
+  adminPrisma: PrismaClient | undefined;
+  demoPrisma: PrismaClient | undefined;
 };
 
-export const prisma = globalForPrisma.prisma ?? createPrismaClient();
+export const adminPrisma =
+  g.adminPrisma ?? createClient(process.env.DATABASE_URL!);
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+export const demoPrisma =
+  g.demoPrisma ??
+  createClient(process.env.DEMO_DATABASE_URL ?? process.env.DATABASE_URL!);
+
+if (process.env.NODE_ENV !== "production") {
+  g.adminPrisma = adminPrisma;
+  g.demoPrisma = demoPrisma;
+}
+
+// Default export kept for write-only paths that are always admin
+export const prisma = adminPrisma;

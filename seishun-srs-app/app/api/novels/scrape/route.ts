@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { isAdminRequest } from "@/lib/auth";
 import { spawn } from "child_process";
 import { readFileSync, unlinkSync, existsSync } from "fs";
 import { tmpdir } from "os";
@@ -15,6 +16,10 @@ const SCRAPE_SCRIPT = resolve(process.cwd(), "..", "Scrape.py");
 //   {"type":"complete","novelId":N}
 //   {"type":"error","message":"..."}
 export async function POST(req: NextRequest) {
+  if (!isAdminRequest(req)) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const body = await req.json();
   const { url, title, slug, autoBlacklist = true } = body as {
     url: string;
