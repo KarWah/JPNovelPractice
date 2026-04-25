@@ -16,7 +16,8 @@ export default async function VocabDetailPage({ params }: PageProps) {
   const entryId = parseInt(id);
   if (isNaN(entryId)) notFound();
 
-  const [db, admin] = await Promise.all([getDb(), isAdmin()]);
+  const db = await getDb();
+  const admin = await isAdmin();
 
   const entry = await db.vocabEntry.findUnique({
     where: { id: entryId },

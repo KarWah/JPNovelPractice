@@ -6,7 +6,8 @@ import { getNovelSummary } from "@/lib/repositories/vocab";
 export const dynamic = "force-dynamic";
 
 export default async function LandingPage() {
-  const [db, admin] = await Promise.all([getDb(), isAdmin()]);
+  const db = await getDb();
+  const admin = await isAdmin();
 
   const novels = await db.novel.findMany({
     orderBy: { sortOrder: "asc" },
