@@ -56,7 +56,7 @@ async function getAnalytics() {
   const logsWithDates = await db.reviewLog.findMany({
     select: { reviewedAt: true },
     orderBy: { reviewedAt: "desc" },
-  });
+  }) as { reviewedAt: Date }[];
   const reviewedDays = new Set(logsWithDates.map((l) => localDateKey(l.reviewedAt)));
   const startFrom = reviewedDays.has(todayKey) ? 0 : 1;
   let streak = 0;
