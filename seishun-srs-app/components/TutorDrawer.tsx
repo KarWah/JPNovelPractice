@@ -57,17 +57,17 @@ export default function TutorDrawer({ vocabContext }: Props) {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/ollama", {
+      const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question, vocabContext }),
       });
 
       if (!res.ok || !res.body) {
-        const err = await res.json().catch(() => ({ error: "Ollama unavailable" }));
+        const err = await res.json().catch(() => ({ error: "AI tutor unavailable" }));
         setMessages((prev) => [
           ...prev.slice(0, -1),
-          { role: "assistant", content: err.error ?? "Error contacting Ollama." },
+          { role: "assistant", content: err.error ?? "Error contacting AI tutor." },
         ]);
         return;
       }
