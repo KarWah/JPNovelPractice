@@ -26,5 +26,4 @@ if (process.env.NODE_ENV !== "production") {
   g.demoPrisma = demoPrisma;
 }
 
-// Default export kept for write-only paths that are always admin
 export const prisma = adminPrisma;
