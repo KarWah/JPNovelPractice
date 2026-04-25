@@ -53,3 +53,5 @@ __pycache__/
 
 # jmdict enrichment cache (downloaded at runtime)
 scripts/.cache/
+seishun-srs-app/db_dump.bak
+seishun-srs-app/seishun_backup.sql
