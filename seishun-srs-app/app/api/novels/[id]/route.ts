@@ -53,7 +53,7 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
     await prisma.vocabEntry.findMany({
       where: { novelId },
       select: { id: true },
-    })
+    }) as { id: number }[]
   ).map((v) => v.id);
 
   if (vocabIds.length > 0) {
