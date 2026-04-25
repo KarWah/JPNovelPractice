@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Noto_Sans_JP, Geist_Mono } from "next/font/google";
 import ServiceWorkerRegistrar from "@/components/ServiceWorkerRegistrar";
 import AdminBar from "@/components/AdminBar";
-import { isAdmin } from "@/lib/auth";
+import { getUser } from "@/lib/auth";
 import "./globals.css";
 
 const notoSansJP = Noto_Sans_JP({
@@ -26,16 +26,16 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const admin = await isAdmin();
+  const user = await getUser();
 
   return (
     <html
       lang="ja"
       className={`${notoSansJP.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className={`min-h-full flex flex-col bg-zinc-50 dark:bg-zinc-950 font-[var(--font-noto-jp)] ${admin ? "pt-8" : ""}`}>
+      <body className={`min-h-full flex flex-col bg-zinc-50 dark:bg-zinc-950 font-[var(--font-noto-jp)] ${user ? "pt-8" : ""}`}>
         <ServiceWorkerRegistrar />
-        {admin && <AdminBar />}
+        {user && <AdminBar email={user.email} isAdmin={user.role === "ADMIN"} />}
         {children}
       </body>
     </html>

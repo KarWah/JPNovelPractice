@@ -2,9 +2,8 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isAdminRequest } from "@/lib/auth";
 
-// POST /api/novels/reorder (admin only)
 export async function POST(req: NextRequest) {
-  if (!isAdminRequest(req)) {
+  if (!(await isAdminRequest(req))) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -12,9 +11,7 @@ export async function POST(req: NextRequest) {
 
   if (
     !Array.isArray(updates) ||
-    updates.some(
-      (u) => typeof u.id !== "number" || typeof u.sortOrder !== "number"
-    )
+    updates.some((u) => typeof u.id !== "number" || typeof u.sortOrder !== "number")
   ) {
     return Response.json({ error: "Expected array of { id, sortOrder }" }, { status: 400 });
   }

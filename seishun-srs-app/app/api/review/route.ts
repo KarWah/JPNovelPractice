@@ -1,22 +1,28 @@
 import { NextRequest } from "next/server";
 import { calculateNextReview, type Grade } from "@/lib/srs";
 import { getReviewQueue } from "@/lib/repositories/vocab";
-import { isAdminRequest, getDbForRequest } from "@/lib/auth";
+import { getUserFromRequest } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 
 // GET /api/review?novelId=1&count=20
 export async function GET(req: NextRequest) {
+  const user = await getUserFromRequest(req);
+  if (!user) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { searchParams } = req.nextUrl;
   const novelId = parseInt(searchParams.get("novelId") ?? "1");
   const count   = Math.min(Math.max(parseInt(searchParams.get("count") ?? "20"), 1), 200);
 
-  const db = getDbForRequest(req);
-  const queue = await getReviewQueue(novelId, count, db);
+  const queue = await getReviewQueue(novelId, count, user.id);
   return Response.json(queue);
 }
 
-// POST /api/review — submit a grade for a card (admin only)
+// POST /api/review — submit a grade for a card
 export async function POST(req: NextRequest) {
-  if (!isAdminRequest(req)) {
+  const user = await getUserFromRequest(req);
+  if (!user) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -27,8 +33,9 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: "Invalid payload" }, { status: 400 });
   }
 
-  const { adminPrisma } = await import("@/lib/prisma");
-  const existing = await adminPrisma.userProgress.findUnique({ where: { vocabId } });
+  const existing = await prisma.userProgress.findUnique({
+    where: { userId_vocabId: { userId: user.id, vocabId } },
+  });
 
   const currentState = existing ?? {
     easeFactor: 2.5,
@@ -40,12 +47,12 @@ export async function POST(req: NextRequest) {
   const next = calculateNextReview(currentState, grade);
 
   const [progress] = await Promise.all([
-    adminPrisma.userProgress.upsert({
-      where: { vocabId },
-      create:  { vocabId, ...next, lastReviewDate: new Date(), totalReviews: 1 },
+    prisma.userProgress.upsert({
+      where: { userId_vocabId: { userId: user.id, vocabId } },
+      create:  { userId: user.id, vocabId, ...next, lastReviewDate: new Date(), totalReviews: 1 },
       update:  { ...next, lastReviewDate: new Date(), totalReviews: { increment: 1 } },
     }),
-    adminPrisma.reviewLog.create({ data: { vocabId, grade } }),
+    prisma.reviewLog.create({ data: { userId: user.id, vocabId, grade } }),
   ]);
 
   return Response.json({ progress });

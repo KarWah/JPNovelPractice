@@ -9,21 +9,13 @@ function createClient(connectionString: string) {
   });
 }
 
-const g = globalThis as unknown as {
-  adminPrisma: PrismaClient | undefined;
-  demoPrisma: PrismaClient | undefined;
-};
+const g = globalThis as unknown as { prisma: PrismaClient | undefined };
 
-export const adminPrisma =
-  g.adminPrisma ?? createClient(process.env.DATABASE_URL!);
-
-export const demoPrisma =
-  g.demoPrisma ??
-  createClient(process.env.DEMO_DATABASE_URL ?? process.env.DATABASE_URL!);
+export const prisma = g.prisma ?? createClient(process.env.DATABASE_URL!);
 
 if (process.env.NODE_ENV !== "production") {
-  g.adminPrisma = adminPrisma;
-  g.demoPrisma = demoPrisma;
+  g.prisma = prisma;
 }
 
-export const prisma = adminPrisma;
+// Legacy alias — remove once all callers are updated
+export const adminPrisma = prisma;

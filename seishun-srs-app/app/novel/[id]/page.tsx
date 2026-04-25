@@ -1,6 +1,6 @@
-import { isAdmin } from "@/lib/auth";
-import { adminPrisma, demoPrisma } from "@/lib/prisma";
-import { notFound } from "next/navigation";
+import { getUser } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { notFound, redirect } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -15,33 +15,31 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-async function NovelDashboardContent({ novelId, admin }: { novelId: number; admin: boolean }) {
+async function NovelDashboardContent({ novelId, userId, isAdmin }: { novelId: number; userId: string | undefined; isAdmin: boolean }) {
   try {
-    const db = admin ? adminPrisma : demoPrisma;
     const [novel, stats, otherNovelProgress] = await Promise.all([
-      db.novel.findUnique({ where: { id: novelId } }),
-      getNovelStats(novelId, db),
-      db.userProgress.count({ where: { vocab: { novelId: { not: novelId } } } }),
+      prisma.novel.findUnique({ where: { id: novelId } }),
+      getNovelStats(novelId, userId),
+      userId
+        ? prisma.userProgress.count({ where: { userId, vocab: { novelId: { not: novelId } } } })
+        : Promise.resolve(0),
     ]);
 
     if (!novel) return <div>Novel not found</div>;
 
     const isNewNovel = stats.learnedCount === 0;
     const hasKnownFromOtherNovels = isNewNovel && otherNovelProgress > 0;
-
     const { totalVocab, learnedCount, dueCount, newAvailableCount, totalReviews, maxSessionCards } = stats;
     const coveragePct = Math.round((learnedCount / Math.max(totalVocab, 1)) * 100);
 
     return (
       <>
-        {/* Breadcrumb */}
         <div className="w-full max-w-lg">
           <Link href="/" className="text-sm text-zinc-400 hover:text-zinc-600 transition-colors">
             ← All novels
           </Link>
         </div>
 
-        {/* Hero — cover + title */}
         <div className="w-full max-w-lg flex gap-5 items-center bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-700 p-5 shadow-sm">
           {novel.coverImage && (
             <div className="relative w-20 h-28 shrink-0 rounded-lg overflow-hidden shadow">
@@ -62,12 +60,10 @@ async function NovelDashboardContent({ novelId, admin }: { novelId: number; admi
           </div>
         </div>
 
-        {/* Cross-novel setup (shown when starting a new novel with prior known words) */}
-        {admin && isNewNovel && hasKnownFromOtherNovels && (
+        {isAdmin && isNewNovel && hasKnownFromOtherNovels && (
           <CrossNovelSetup novelId={novelId} />
         )}
 
-        {/* Stats grid */}
         <div className="w-full max-w-lg grid grid-cols-2 gap-4">
           <StatCard label="Due for review" value={dueCount} accent="indigo" />
           <StatCard label="New available" value={newAvailableCount} accent="yellow" />
@@ -82,23 +78,13 @@ async function NovelDashboardContent({ novelId, admin }: { novelId: number; admi
           </div>
         </div>
 
-        {/* Session starter with slider (admin only — requires UserProgress writes) */}
-        {admin ? (
-          <div className="w-full max-w-lg bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-700 p-6 shadow-sm">
-            <h2 className="text-sm font-semibold text-zinc-500 uppercase tracking-wide mb-4">
-              Start a session
-            </h2>
-            <SessionStarter novelId={novelId} maxAvailable={maxSessionCards} />
-          </div>
-        ) : (
-          <div className="w-full max-w-lg bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-200 dark:border-zinc-700 p-6 text-center">
-            <p className="text-sm text-zinc-400">
-              This is a demo — study sessions are disabled for visitors.
-            </p>
-          </div>
-        )}
+        <div className="w-full max-w-lg bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-700 p-6 shadow-sm">
+          <h2 className="text-sm font-semibold text-zinc-500 uppercase tracking-wide mb-4">
+            Start a session
+          </h2>
+          <SessionStarter novelId={novelId} maxAvailable={maxSessionCards} />
+        </div>
 
-        {/* Secondary actions */}
         <div className="w-full max-w-lg flex flex-col gap-3">
           <Link
             href={`/vocab?novelId=${novelId}`}
@@ -114,8 +100,7 @@ async function NovelDashboardContent({ novelId, admin }: { novelId: number; admi
           </Link>
         </div>
 
-        {/* Advanced: manual cross-novel blacklist re-check (admin only) */}
-        {admin && <CrossNovelSetup novelId={novelId} showAsButton />}
+        {isAdmin && <CrossNovelSetup novelId={novelId} showAsButton />}
       </>
     );
   } catch (e) {
@@ -143,12 +128,17 @@ export default async function NovelDashboard({ params }: PageProps) {
   const novelId = parseInt(id);
   if (isNaN(novelId)) notFound();
 
-  const admin = await isAdmin();
+  const user = await getUser();
+  if (!user) redirect("/login");
 
   return (
     <div className="flex flex-col items-center min-h-screen px-4 py-10 gap-8">
       <Suspense fallback={<LoadingContent />}>
-        <NovelDashboardContent novelId={novelId} admin={admin} />
+        <NovelDashboardContent
+          novelId={novelId}
+          userId={user.id}
+          isAdmin={user.role === "ADMIN"}
+        />
       </Suspense>
     </div>
   );

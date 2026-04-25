@@ -2,9 +2,8 @@ import { NextRequest } from "next/server";
 import { blacklist } from "@/lib/services/blacklist";
 import { isAdminRequest } from "@/lib/auth";
 
-// POST /api/blacklist — mark a word as blacklisted (admin only)
 export async function POST(req: NextRequest) {
-  if (!isAdminRequest(req)) {
+  if (!(await isAdminRequest(req))) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 

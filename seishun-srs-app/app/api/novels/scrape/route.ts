@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
-import { isAdminRequest } from "@/lib/auth";
+import { getUserFromRequest } from "@/lib/auth";
+import { Role } from "@prisma/client";
 import { spawn } from "child_process";
 import { readFileSync, unlinkSync, existsSync } from "fs";
 import { tmpdir } from "os";
@@ -16,7 +17,8 @@ const SCRAPE_SCRIPT = resolve(process.cwd(), "..", "Scrape.py");
 //   {"type":"complete","novelId":N}
 //   {"type":"error","message":"..."}
 export async function POST(req: NextRequest) {
-  if (!isAdminRequest(req)) {
+  const user = await getUserFromRequest(req);
+  if (user?.role !== Role.ADMIN) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -114,9 +116,8 @@ export async function POST(req: NextRequest) {
 
           await prisma.vocabEntry.createMany({ data: vocabData, skipDuplicates: true });
 
-          // Cross-novel blacklist if requested
           if (autoBlacklist) {
-            await blacklistCrossNovel(novel.id);
+            await blacklistCrossNovel(novel.id, user.id);
           }
 
           send({ type: "complete", novelId: novel.id });

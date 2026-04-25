@@ -18,9 +18,10 @@ export interface NovelGridItem {
 interface Props {
   initialNovels: NovelGridItem[];
   isAdmin?: boolean;
+  isLoggedIn?: boolean;
 }
 
-export default function NovelGrid({ initialNovels, isAdmin = false }: Props) {
+export default function NovelGrid({ initialNovels, isAdmin = false, isLoggedIn = false }: Props) {
   const [novels, setNovels]         = useState(initialNovels);
   const [dragSrcId, setDragSrcId]   = useState<number | null>(null);
   const [dragOverId, setDragOverId] = useState<number | null>(null);
@@ -290,32 +291,28 @@ export default function NovelGrid({ initialNovels, isAdmin = false }: Props) {
         );
       })}
 
-      {/* Add novel tile (admin) / Login prompt (visitor) */}
+      {/* Add novel tile (admin) / Sign-up prompt (visitor) */}
       {isAdmin ? (
         <Link
           href="/novels/new"
           className="group relative bg-white dark:bg-zinc-900 rounded-2xl border-2 border-dashed border-zinc-200 dark:border-zinc-700 hover:border-indigo-300 dark:hover:border-indigo-600 overflow-hidden transition-all duration-200 flex flex-col items-center justify-center gap-3 min-h-[280px]"
         >
-          <div className="text-4xl text-zinc-300 dark:text-zinc-600 group-hover:text-indigo-400 transition-colors">
-            +
-          </div>
+          <div className="text-4xl text-zinc-300 dark:text-zinc-600 group-hover:text-indigo-400 transition-colors">+</div>
           <p className="text-sm font-medium text-zinc-400 dark:text-zinc-500 group-hover:text-indigo-500 transition-colors">
             Add novel
           </p>
         </Link>
-      ) : (
+      ) : !isLoggedIn ? (
         <Link
-          href="/login"
+          href="/register"
           className="group relative bg-white dark:bg-zinc-900 rounded-2xl border-2 border-dashed border-zinc-200 dark:border-zinc-700 hover:border-indigo-300 dark:hover:border-indigo-600 overflow-hidden transition-all duration-200 flex flex-col items-center justify-center gap-3 min-h-[280px]"
         >
-          <div className="text-3xl text-zinc-300 dark:text-zinc-600 group-hover:text-indigo-400 transition-colors">
-            🔒
-          </div>
+          <div className="text-3xl text-zinc-300 dark:text-zinc-600 group-hover:text-indigo-400 transition-colors">✦</div>
           <p className="text-sm font-medium text-zinc-400 dark:text-zinc-500 group-hover:text-indigo-500 transition-colors text-center px-4">
-            Admin login
+            Create an account to study
           </p>
         </Link>
-      )}
+      ) : null}
     </div>
   );
 }

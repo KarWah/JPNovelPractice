@@ -8,7 +8,7 @@ interface RouteParams {
 
 // PATCH /api/novels/[id] (admin only)
 export async function PATCH(req: NextRequest, { params }: RouteParams) {
-  if (!isAdminRequest(req)) {
+  if (!(await isAdminRequest(req))) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -34,7 +34,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
 
 // DELETE /api/novels/[id] (admin only)
 export async function DELETE(req: NextRequest, { params }: RouteParams) {
-  if (!isAdminRequest(req)) {
+  if (!(await isAdminRequest(req))) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 

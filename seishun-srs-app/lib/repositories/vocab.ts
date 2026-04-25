@@ -1,5 +1,4 @@
-import { PrismaClient } from "@prisma/client";
-import { adminPrisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 import type { VocabCardEntry } from "@/lib/types";
 
 // ── Novel stats ───────────────────────────────────────────────────────────────
@@ -15,22 +14,26 @@ export interface NovelStats {
 
 export async function getNovelStats(
   novelId: number,
-  db: PrismaClient = adminPrisma
+  userId: string | null | undefined,
 ): Promise<NovelStats> {
-  const now = new Date();
+  if (!userId) {
+    const totalVocab = await prisma.vocabEntry.count({ where: { novelId, blacklisted: false } });
+    return { totalVocab, learnedCount: 0, dueCount: 0, newAvailableCount: 0, totalReviews: 0, maxSessionCards: 0 };
+  }
 
+  const now = new Date();
   const [totalVocab, learnedCount, dueCount, totalReviews, blacklistedCount] = await Promise.all([
-    db.vocabEntry.count({ where: { novelId, blacklisted: false } }),
-    db.userProgress.count({ where: { vocab: { novelId } } }),
-    db.userProgress.count({
-      where: { nextReviewDate: { lte: now }, vocab: { novelId, blacklisted: false } },
+    prisma.vocabEntry.count({ where: { novelId, blacklisted: false } }),
+    prisma.userProgress.count({ where: { userId, vocab: { novelId } } }),
+    prisma.userProgress.count({
+      where: { userId, nextReviewDate: { lte: now }, vocab: { novelId, blacklisted: false } },
     }),
-    db.reviewLog.count({ where: { vocab: { novelId } } }),
-    db.vocabEntry.count({ where: { novelId, blacklisted: true } }),
+    prisma.reviewLog.count({ where: { userId, vocab: { novelId } } }),
+    prisma.vocabEntry.count({ where: { novelId, blacklisted: true } }),
   ]);
 
-  const learnedIds = await getLearnedVocabIds(novelId, db);
-  const newAvailableCount = await getNewWordsCount(novelId, learnedIds, db);
+  const learnedIds = await getLearnedVocabIds(novelId, userId);
+  const newAvailableCount = await getNewWordsCount(novelId, learnedIds);
 
   return {
     totalVocab,
@@ -52,15 +55,17 @@ export interface NovelSummary {
 
 export async function getNovelSummary(
   novelId: number,
-  db: PrismaClient = adminPrisma
+  userId: string | null | undefined,
 ): Promise<NovelSummary> {
+  if (!userId) return { novelId, learned: 0, due: 0 };
+
   const now = new Date();
   const [learned, due, blacklisted] = await Promise.all([
-    db.userProgress.count({ where: { vocab: { novelId } } }),
-    db.userProgress.count({
-      where: { vocab: { novelId }, nextReviewDate: { lte: now } },
+    prisma.userProgress.count({ where: { userId, vocab: { novelId } } }),
+    prisma.userProgress.count({
+      where: { userId, vocab: { novelId }, nextReviewDate: { lte: now } },
     }),
-    db.vocabEntry.count({ where: { novelId, blacklisted: true } }),
+    prisma.vocabEntry.count({ where: { novelId, blacklisted: true } }),
   ]);
   return { novelId, learned: learned + blacklisted, due };
 }
@@ -75,12 +80,13 @@ export interface ReviewQueue {
 export async function getReviewQueue(
   novelId: number,
   count: number,
-  db: PrismaClient = adminPrisma
+  userId: string,
 ): Promise<ReviewQueue> {
   const now = new Date();
 
-  const due = await db.userProgress.findMany({
+  const due = await prisma.userProgress.findMany({
     where: {
+      userId,
       nextReviewDate: { lte: now },
       vocab: { novelId, blacklisted: false },
     },
@@ -90,24 +96,23 @@ export async function getReviewQueue(
   }) as { vocab: VocabCardEntry }[];
 
   const newWordSlots = Math.max(0, count - due.length);
-  const newWords =
-    newWordSlots > 0
-      ? await getNewWords(novelId, newWordSlots, undefined, db)
-      : [];
+  const newWords = newWordSlots > 0
+    ? await getNewWords(novelId, newWordSlots, userId)
+    : [];
 
   return { due, newWords };
 }
 
-// ── New words (not yet in UserProgress) ───────────────────────────────────────
+// ── New words (not yet in this user's UserProgress) ───────────────────────────
 
 export async function getNewWords(
   novelId: number,
   limit: number,
+  userId: string,
   learnedIds?: number[],
-  db: PrismaClient = adminPrisma
 ): Promise<VocabCardEntry[]> {
-  const ids = learnedIds ?? await getLearnedVocabIds(novelId, db);
-  return db.vocabEntry.findMany({
+  const ids = learnedIds ?? await getLearnedVocabIds(novelId, userId);
+  return prisma.vocabEntry.findMany({
     where: {
       novelId,
       blacklisted: false,
@@ -119,12 +124,8 @@ export async function getNewWords(
   }) as unknown as VocabCardEntry[];
 }
 
-async function getNewWordsCount(
-  novelId: number,
-  learnedIds: number[],
-  db: PrismaClient = adminPrisma
-): Promise<number> {
-  return db.vocabEntry.count({
+async function getNewWordsCount(novelId: number, learnedIds: number[]): Promise<number> {
+  return prisma.vocabEntry.count({
     where: {
       novelId,
       blacklisted: false,
@@ -136,12 +137,15 @@ async function getNewWordsCount(
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 export async function getLearnedVocabIds(
-  novelId?: number,
-  db: PrismaClient = adminPrisma
+  novelId: number | undefined,
+  userId: string,
 ): Promise<number[]> {
-  const rows = await db.userProgress.findMany({
+  const rows = await prisma.userProgress.findMany({
     select: { vocabId: true },
-    ...(novelId ? { where: { vocab: { novelId } } } : {}),
+    where: {
+      userId,
+      ...(novelId !== undefined ? { vocab: { novelId } } : {}),
+    },
   });
   return rows.map((r) => r.vocabId);
 }

@@ -6,84 +6,101 @@ datasource db {
   provider = "postgresql"
 }
 
-model Novel {
-  id          Int          @id @default(autoincrement())
-  slug        String       @unique
-  title       String
-  coverImage  String?      // path relative to /public, e.g. "assets/bunny_vol_1.webp"
-  sortOrder   Int          @default(0)
+enum Role {
+  ADMIN
+  USER
+}
 
+model User {
+  id           String         @id @default(cuid())
+  email        String         @unique
+  passwordHash String
+  role         Role           @default(USER)
+  createdAt    DateTime       @default(now())
+  sessions     Session[]
+  progress     UserProgress[]
+  reviewLogs   ReviewLog[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model Novel {
+  id           Int          @id @default(autoincrement())
+  slug         String       @unique
+  title        String
+  coverImage   String?
+  sortOrder    Int          @default(0)
   vocabEntries VocabEntry[]
 }
 
 model VocabEntry {
-  id           Int               @id @default(autoincrement())
-  kanji        String?           // e.g. "青春" — null for pure-kana words
-  kana         String            // e.g. "せいしゅん" — authoritative reading
-  meaning      String            // Primary meaning from JPDB scrape
-  occurrences  Int               @default(0)
-
-  // Novel this entry belongs to
-  novelId      Int               @default(1)
-  novel        Novel             @relation(fields: [novelId], references: [id])
-
-  // JMdict enrichment (populated by scripts/jmdict_enrich.py)
+  id            Int               @id @default(autoincrement())
+  kanji         String?
+  kana          String
+  meaning       String
+  occurrences   Int               @default(0)
+  novelId       Int               @default(1)
+  novel         Novel             @relation(fields: [novelId], references: [id])
   jmdictId      Int?
-  jlptLevel     String?          // "N1" | "N2" | "N3" | "N4" | "N5"
+  jlptLevel     String?
   partsOfSpeech String[]
-  allReadings   String[]         // all kana readings from JMdict
-  allMeanings   String[]         // all senses as formatted strings
-  tags          String[]         // misc tags e.g. "usually written using kana alone"
-
-  // Study control
-  blacklisted  Boolean           @default(false)
-
-  // Relations
-  sentences    ExampleSentence[]
-  progress     UserProgress?
-  reviewLogs   ReviewLog[]
+  allReadings   String[]
+  allMeanings   String[]
+  tags          String[]
+  blacklisted   Boolean           @default(false)
+  sentences     ExampleSentence[]
+  progress      UserProgress[]
+  reviewLogs    ReviewLog[]
 }
 
 model ExampleSentence {
   id           Int        @id @default(autoincrement())
-  japaneseText String     // bracket notation: "[私](わたし)は..."
+  japaneseText String
   englishTrans String
-
   vocabId      Int
   vocab        VocabEntry @relation(fields: [vocabId], references: [id])
 }
 
 model UserProgress {
   id             Int        @id @default(autoincrement())
-
+  userId         String?
+  user           User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
   easeFactor     Float      @default(2.5)
   interval       Int        @default(0)
   repetitions    Int        @default(0)
   nextReviewDate DateTime   @default(now())
   lastReviewDate DateTime?
   totalReviews   Int        @default(0)
-
-  vocabId        Int        @unique
+  vocabId        Int
   vocab          VocabEntry @relation(fields: [vocabId], references: [id])
+
+  @@unique([userId, vocabId])
 }
 
 model ReviewLog {
   id         Int        @id @default(autoincrement())
+  userId     String?
+  user       User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
   vocabId    Int
   grade      Int
   reviewedAt DateTime   @default(now())
-
   vocab      VocabEntry @relation(fields: [vocabId], references: [id])
 }
 
-// Per-kanji data from KANJIDIC2 (populated by scripts/kanjidic_import.py)
 model KanjiEntry {
-  character   String   @id   // the single kanji character, e.g. "青"
-  onyomi      String[]       // e.g. ["セイ", "ショウ"]
-  kunyomi     String[]       // e.g. ["あお.い", "あお"]
-  meanings    String[]       // English meanings e.g. ["blue", "green"]
+  character   String   @id
+  onyomi      String[]
+  kunyomi     String[]
+  meanings    String[]
   strokeCount Int?
-  jlptLevel   String?        // "N1"–"N5"
-  grade       Int?           // school grade (1-6, 8=secondary, 9=name-use)
-  frequency   Int?           // newspaper frequency rank
+  jlptLevel   String?
+  grade       Int?
+  frequency   Int?
 }

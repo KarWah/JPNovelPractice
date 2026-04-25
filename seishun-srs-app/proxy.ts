@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export function proxy(req: NextRequest) {
-  const secret = process.env.ADMIN_SECRET;
-  const token = req.cookies.get("admin_token")?.value;
-  const isAdmin = !!secret && token === secret;
-
-  if (!isAdmin) {
+  const token = req.cookies.get("session_token")?.value;
+  if (!token) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
-
   return NextResponse.next();
 }
 

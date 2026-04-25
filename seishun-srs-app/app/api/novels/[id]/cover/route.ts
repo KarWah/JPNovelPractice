@@ -13,7 +13,7 @@ interface RouteParams {
 
 // POST /api/novels/[id]/cover — multipart/form-data, field "cover" (admin only)
 export async function POST(req: NextRequest, { params }: RouteParams) {
-  if (!isAdminRequest(req)) {
+  if (!(await isAdminRequest(req))) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 

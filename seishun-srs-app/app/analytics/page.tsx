@@ -1,5 +1,6 @@
-import { isAdmin } from "@/lib/auth";
-import { adminPrisma, demoPrisma } from "@/lib/prisma";
+import { getUser } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import StatCard from "@/components/StatCard";
 
@@ -9,9 +10,7 @@ function localDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-async function getAnalytics() {
-  const admin = await isAdmin();
-  const db = admin ? adminPrisma : demoPrisma;
+async function getAnalytics(userId: string) {
   const now = new Date();
   const todayKey = localDateKey(now);
 
@@ -19,8 +18,8 @@ async function getAnalytics() {
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
   sevenDaysAgo.setHours(0, 0, 0, 0);
 
-  const recentLogs = await db.reviewLog.findMany({
-    where: { reviewedAt: { gte: sevenDaysAgo } },
+  const recentLogs = await prisma.reviewLog.findMany({
+    where: { userId, reviewedAt: { gte: sevenDaysAgo } },
     select: { reviewedAt: true, grade: true },
   });
 
@@ -49,16 +48,17 @@ async function getAnalytics() {
   }));
 
   const [totalLearned, totalVocab, totalBlacklisted, allTimeReviews] = await Promise.all([
-    db.userProgress.count(),
-    db.vocabEntry.count(),
-    db.vocabEntry.count({ where: { blacklisted: true } }),
-    db.reviewLog.count(),
+    prisma.userProgress.count({ where: { userId } }),
+    prisma.vocabEntry.count(),
+    prisma.vocabEntry.count({ where: { blacklisted: true } }),
+    prisma.reviewLog.count({ where: { userId } }),
   ]);
 
-  const logsWithDates = await db.reviewLog.findMany({
+  const logsWithDates = await prisma.reviewLog.findMany({
+    where: { userId },
     select: { reviewedAt: true },
     orderBy: { reviewedAt: "desc" },
-  }) as { reviewedAt: Date }[];
+  });
   const reviewedDays = new Set(logsWithDates.map((l) => localDateKey(l.reviewedAt)));
   const startFrom = reviewedDays.has(todayKey) ? 0 : 1;
   let streak = 0;
@@ -72,20 +72,14 @@ async function getAnalytics() {
     }
   }
 
-  return {
-    dailyReviews,
-    todayKey,
-    totalLearned,
-    totalVocab,
-    totalBlacklisted,
-    allTimeReviews,
-    streak,
-  };
+  return { dailyReviews, todayKey, totalLearned, totalVocab, totalBlacklisted, allTimeReviews, streak };
 }
 
 export default async function AnalyticsPage() {
-  const data = await getAnalytics();
+  const user = await getUser();
+  if (!user) redirect("/login");
 
+  const data = await getAnalytics(user.id);
   const maxDaily = Math.max(...data.dailyReviews.map((d) => d.total), 1);
   const todayReviews = data.dailyReviews.find((d) => d.date === data.todayKey)?.total ?? 0;
 
@@ -117,10 +111,7 @@ export default async function AnalyticsPage() {
         </div>
         {data.totalBlacklisted > 0 && (
           <div className="col-span-2">
-            <StatCard
-              label="Blacklisted (already known)"
-              value={data.totalBlacklisted}
-            />
+            <StatCard label="Blacklisted (already known)" value={data.totalBlacklisted} />
           </div>
         )}
       </div>
