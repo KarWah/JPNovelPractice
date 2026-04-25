@@ -1,4 +1,5 @@
-import { getDb, isAdmin } from "@/lib/auth";
+import { isAdmin } from "@/lib/auth";
+import { adminPrisma, demoPrisma } from "@/lib/prisma";
 import NovelGrid from "@/components/NovelGrid";
 import type { NovelGridItem } from "@/components/NovelGrid";
 import { getNovelSummary } from "@/lib/repositories/vocab";
@@ -6,8 +7,8 @@ import { getNovelSummary } from "@/lib/repositories/vocab";
 export const dynamic = "force-dynamic";
 
 export default async function LandingPage() {
-  const db = await getDb();
   const admin = await isAdmin();
+  const db = admin ? adminPrisma : demoPrisma;
 
   const novels = await db.novel.findMany({
     orderBy: { sortOrder: "asc" },

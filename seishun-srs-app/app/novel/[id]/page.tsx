@@ -1,4 +1,5 @@
-import { getDb, isAdmin } from "@/lib/auth";
+import { isAdmin } from "@/lib/auth";
+import { adminPrisma, demoPrisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -16,7 +17,7 @@ interface PageProps {
 
 async function NovelDashboardContent({ novelId, admin }: { novelId: number; admin: boolean }) {
   try {
-    const db = await getDb();
+    const db = admin ? adminPrisma : demoPrisma;
     const [novel, stats, otherNovelProgress] = await Promise.all([
       db.novel.findUnique({ where: { id: novelId } }),
       getNovelStats(novelId, db),

@@ -1,4 +1,5 @@
-import { getDb, isAdmin } from "@/lib/auth";
+import { isAdmin } from "@/lib/auth";
+import { adminPrisma, demoPrisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import FuriganaText from "@/components/FuriganaText";
@@ -16,8 +17,8 @@ export default async function VocabDetailPage({ params }: PageProps) {
   const entryId = parseInt(id);
   if (isNaN(entryId)) notFound();
 
-  const db = await getDb();
   const admin = await isAdmin();
+  const db = admin ? adminPrisma : demoPrisma;
 
   const entry = await db.vocabEntry.findUnique({
     where: { id: entryId },

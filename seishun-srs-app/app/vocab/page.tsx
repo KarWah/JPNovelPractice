@@ -1,4 +1,5 @@
-import { getDb } from "@/lib/auth";
+import { isAdmin } from "@/lib/auth";
+import { adminPrisma, demoPrisma } from "@/lib/prisma";
 import Link from "next/link";
 import { Suspense } from "react";
 import VocabFilters from "./VocabFilters";
@@ -19,7 +20,8 @@ interface PageProps {
 
 export default async function VocabPage({ searchParams }: PageProps) {
   const sp = await searchParams;
-  const db = await getDb();
+  const admin = await isAdmin();
+  const db = admin ? adminPrisma : demoPrisma;
   const q = sp.q ?? "";
   const jlpt = sp.jlpt ?? "";
   const status = sp.status ?? "";

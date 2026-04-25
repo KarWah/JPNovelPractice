@@ -1,4 +1,5 @@
-import { getDb } from "@/lib/auth";
+import { isAdmin } from "@/lib/auth";
+import { adminPrisma, demoPrisma } from "@/lib/prisma";
 import Link from "next/link";
 import StatCard from "@/components/StatCard";
 
@@ -9,7 +10,8 @@ function localDateKey(d: Date): string {
 }
 
 async function getAnalytics() {
-  const db = await getDb();
+  const admin = await isAdmin();
+  const db = admin ? adminPrisma : demoPrisma;
   const now = new Date();
   const todayKey = localDateKey(now);
 
