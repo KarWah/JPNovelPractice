@@ -1,125 +1,104 @@
-# Japanese Learning Tool
+<details open>
+<summary>Click to view</summary>
 
-A personal Japanese vocabulary SRS (spaced-repetition) app built around the the ability to import light novel series. Vocabulary is scraped directly from the novels, enriched with JMdict data, and reviewed with an SM-2 algorithm — similar in spirit to [JPDB](https://jpdb.io) or Anki, but tailored to a specific reading list.
+<br>
 
-## Features
+<h1 align="center">JPNovel Practice</h1>
 
-- **Novel-based vocab lists** — scrape vocabulary from any Syosetu/web-novel URL; each novel has its own word list and progress tracking
-- **SM-2 spaced repetition** — four-grade review (Again / Hard / Good / Easy); "Again" cards re-queue within the same session up to twice before being written back
-- **JMdict enrichment** — fills readings, meanings, parts of speech, and JLPT level for every word
-- **Kanji dictionary** — separate KANJIDIC import for per-kanji detail pages
-- **Tatoeba example sentences** — import example sentences for enriched words
-- **Cross-novel blacklist** — automatically (or manually) skip words you already know from other novels
-- **Analytics** — 7-day review chart, JLPT breakdown, daily streak
-- **AI tutor drawer** — context-aware chat via a local Ollama model
-- **PWA** — installable, service-worker backed
+<p align="center">
+  <em>A context-driven Japanese reading tool and spaced repetition system (SRS) for vocabulary acquisition.</em>
+</p>
 
-## Stack
+<p align="center">
+  <img src="https://img.shields.io/badge/Live-seishun.koze.dev-brightgreen?style=for-the-badge" alt="Live Demo" />
+  <img src="https://img.shields.io/badge/Next.js-black?style=for-the-badge&logo=next.js&logoColor=white" alt="Next.js" />
+  <img src="https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL" />
+  <img src="https://img.shields.io/badge/Prisma-3982CE?style=for-the-badge&logo=Prisma&logoColor=white" alt="Prisma" />
+</p>
 
-| Layer | Technology |
-|---|---|
-| Framework | Next.js (App Router, Turbopack) |
-| UI | React 19, Tailwind CSS v4 |
-| ORM | Prisma 7 with `@prisma/adapter-pg` |
-| Database | PostgreSQL 15 (Docker) |
-| Scraping | Python (`Scrape.py`, Beautiful Soup) |
-| Enrichment | Python (`scripts/jmdict_enrich.py`, `scripts/kanjidic_import.py`) |
-| AI | Ollama (local LLM, streamed NDJSON) |
+<!-- 
+🖼️ SCREENSHOT/DEMO PLACEHOLDER 
+Add an image or GIF here showcasing the reader or test interface:
+![JPNovel Reader](link/to/reader-demo.gif)
+-->
 
-## Prerequisites
+## ✨ Key Features
+- **Novel Import & Parsing:** Users can import Japanese texts, which are processed for vocabulary extraction and in-context learning.
+- **Contextual Learning:** Learn vocabulary within the actual sentences they appeared in.
+- **Spaced Repetition System (SRS):** Built-in algorithmic scheduling for vocabulary reviews to optimize long-term retention.
+- **AI Chat Assistant:** Integrated AI helper to provide detailed nuances, grammar explanations, and context-aware definitions during tests.
+- **Secure Authentication:** Custom email/password authentication using bcryptjs and secure session handling.
 
-- Node.js 20+
-- Python 3.10+
-- Docker + Docker Compose
+## 🛠️ Tech Stack
 
-## Setup
+- **Frontend:** Next.js, TypeScript, Tailwind CSS
+- **Backend:** Next.js API Routes / Server Actions
+- **Database:** PostgreSQL, Prisma ORM
+- **AI/ML:** Integrated LLM API for real-time vocabulary lookups
+- **Security:** bcryptjs
+- **Deployment:** Live at [seishun.koze.dev](https://seishun.koze.dev)
 
-### 1. Start the database
+## 🏗️ Architecture Overview
 
-```bash
-docker compose up -d
+The app is built as a full-stack Next.js application taking advantage of Server Components and Server Actions. When a text is imported, the backend parses it into sentences and words, storing the relations in PostgreSQL via Prisma. The review system queries the database based on SRS algorithms to serve due items to the user. AI lookups are streamed directly from the backend to the frontend to assist users in real-time.
+
+```text
+[ Client (Browser) ]
+        |
+ (Next.js Frontend / UI)
+        |
+ [ Next.js API / Server Actions ] <---> [ AI API (Contextual lookups) ]
+        |
+  [ Prisma ORM ]
+        |
+ [ PostgreSQL ] (Users, Books, Vocab, SRS Data)
 ```
 
-This starts PostgreSQL 15 at `localhost:5432` (`seishun_db` / `postgres` / `localpassword`).
+## 🚀 Getting Started
 
-### 2. Install dependencies
+### Prerequisites
+- Node.js (v18+)
+- PostgreSQL
 
-```bash
-cd seishun-srs-app
-npm install
-```
+### Installation
 
-### 3. Configure environment
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/KarWah/JPNovelPractice.git
+   cd JPNovelPractice
+   ```
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Set up Environment Variables:
+   Create a `.env` file:
+   ```env
+   DATABASE_URL="postgresql://user:password@localhost:5432/jpnovel"
+   OPENAI_API_KEY="your-key"
+   SESSION_SECRET="your-secret"
+   ```
+4. Initialize the Database:
+   ```bash
+   npx prisma migrate dev
+   ```
 
-Create `seishun-srs-app/.env`:
+### Running Locally
+1. Start the Next.js development server:
+   ```bash
+   npm run dev
+   ```
+2. Access the app at `http://localhost:3000`.
 
-```env
-DATABASE_URL=postgresql://postgres:localpassword@localhost:5432/seishun_db
-OLLAMA_BASE_URL=http://localhost:11434
-```
+## 📁 Project Structure
+- `/app` - Next.js App Router pages and API routes.
+- `/components` - UI components (Reader, Flashcards, Chat).
+- `/lib/srs` - Logic for the spaced repetition algorithm.
+- `/lib/parser` - Japanese text parsing and tokenization logic.
+- `/prisma` - Database schema and migrations.
 
-### 4. Run migrations and seed
+## 📄 License
+This project is licensed under the MIT License.
 
-```bash
-# from seishun-srs-app/
-npx prisma migrate deploy
-npm run db:seed          # seeds from ../seishun_buta_vocab.json (~17k words)
-```
-
-### 5. Enrich vocabulary (optional but recommended)
-
-```bash
-# from repo root
-python scripts/jmdict_enrich.py          # readings, meanings, JLPT, POS
-python scripts/kanjidic_import.py        # kanji entries
-python scripts/jmdict_enrich.py --examples  # Tatoeba example sentences
-```
-
-JMdict/KANJIDIC data is downloaded and cached to `scripts/.cache/` on first run.
-
-### 6. Run the dev server
-
-```bash
-cd seishun-srs-app
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000).
-
-## Project Structure
-
-```
-Jap_test/
-├── docker-compose.yml          # PostgreSQL service
-├── Scrape.py                   # Novel scraper (accepts --url and --output)
-├── seishun_buta_vocab.json     # Pre-scraped vocabulary seed data
-├── scripts/
-│   ├── jmdict_enrich.py        # JMdict + Tatoeba enrichment
-│   └── kanjidic_import.py      # KANJIDIC kanji import
-└── seishun-srs-app/            # Next.js application
-    ├── app/
-    │   ├── page.tsx            # Novel selection landing
-    │   ├── novel/[id]/         # Per-novel dashboard
-    │   ├── novels/new/         # Add novel (scrape form)
-    │   ├── study/              # Study session
-    │   ├── vocab/              # Browse & word detail
-    │   ├── analytics/          # Global analytics
-    │   └── api/                # API routes
-    ├── components/             # Shared UI components
-    ├── lib/
-    │   ├── types.ts            # Shared DTOs
-    │   ├── jp.ts               # Japanese utilities, JLPT helpers
-    │   ├── srs.ts              # SM-2 algorithm
-    │   ├── furigana.ts         # Furigana parser
-    │   ├── repositories/       # DB query layer
-    │   └── services/           # Blacklist service
-    └── prisma/
-        ├── schema.prisma
-        └── migrations/
-```
-
-## Key Notes
-
-- **Prisma 7**: the datasource in `schema.prisma` has no `url` field — the connection string lives in `prisma.config.ts` and is passed via `PrismaPg` adapter at client construction time.
-- **Furigana format**: bracket notation `[漢字](かんじ)` used throughout.
-- **Vocab data**: all seed entries store the word form in `kana`; `allReadings[0]` is the canonical reading after enrichment.
+</details>
