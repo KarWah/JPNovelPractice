@@ -42,6 +42,7 @@ CRITICAL FORMATTING RULES FOR JAPANESE TEXT:
   const stream = await groq.chat.completions.create({
     model: MODEL,
     stream: true,
+    reasoning_format: "hidden",
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: question },
