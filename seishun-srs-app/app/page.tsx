@@ -39,9 +39,9 @@ export default async function LandingPage() {
           Choose a novel
         </h1>
         <p className="text-zinc-500 dark:text-zinc-400">
-          {user
-            ? "Select the novel you want to study vocabulary for"
-            : "Log in or create an account to track your progress"}
+            {user
+              ? "Select the novel you want to study vocabulary for"
+              : "Pick a novel to start learning — or sign up to save your progress"}
         </p>
       </div>
 

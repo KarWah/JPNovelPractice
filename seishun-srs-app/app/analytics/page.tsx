@@ -1,6 +1,5 @@
 import { getUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import StatCard from "@/components/StatCard";
 
@@ -77,7 +76,33 @@ async function getAnalytics(userId: string) {
 
 export default async function AnalyticsPage() {
   const user = await getUser();
-  if (!user) redirect("/login");
+
+  if (!user) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen px-4 gap-6">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-50 mb-2">Progress Analytics</h1>
+          <p className="text-zinc-500 dark:text-zinc-400 max-w-md">
+            Sign up or log in to track your study streak, review history, and vocabulary coverage across all novels.
+          </p>
+        </div>
+        <div className="flex gap-3">
+          <Link
+            href="/register"
+            className="px-6 py-3 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold transition-colors"
+          >
+            Sign up free
+          </Link>
+          <Link
+            href="/login"
+            className="px-6 py-3 rounded-full border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+          >
+            Log in
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const data = await getAnalytics(user.id);
   const maxDaily = Math.max(...data.dailyReviews.map((d) => d.total), 1);

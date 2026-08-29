@@ -1,7 +1,10 @@
 import { Suspense } from "react";
+import { getUser } from "@/lib/auth";
 import StudySession from "./StudySession";
 
-export default function StudyPage() {
+export default async function StudyPage() {
+  const user = await getUser();
+
   return (
     <Suspense
       fallback={
@@ -10,7 +13,7 @@ export default function StudyPage() {
         </div>
       }
     >
-      <StudySession />
+      <StudySession isGuest={!user} />
     </Suspense>
   );
 }

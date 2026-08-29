@@ -8,10 +8,20 @@ import TutorDrawer from "@/components/TutorDrawer";
 import type { Grade } from "@/lib/srs";
 import type { SessionCard, VocabCardEntry } from "@/lib/types";
 import Link from "next/link";
+import {
+  recordReview as guestRecordReview,
+  blacklistVocab as guestBlacklist,
+  getLearnedVocabIds as guestGetLearnedIds,
+  getBlacklistedIds as guestGetBlacklistedIds,
+} from "@/lib/guest-srs";
 
 interface ReviewData {
   due: { vocab: VocabCardEntry }[];
   newWords: VocabCardEntry[];
+}
+
+interface GuestReviewData {
+  words: VocabCardEntry[];
 }
 
 // How many times a card can be re-queued in one session after "Again"
@@ -53,7 +63,11 @@ function readSavedSession(key: string): SavedSession | null {
   }
 }
 
-export default function StudyPage() {
+interface StudyPageProps {
+  isGuest: boolean;
+}
+
+export default function StudyPage({ isGuest }: StudyPageProps) {
   const searchParams = useSearchParams();
   const novelId = searchParams.get("novelId") ?? "1";
   const count = searchParams.get("count") ?? "20";
@@ -93,15 +107,32 @@ export default function StudyPage() {
     setStats({ reviewed: 0, correct: 0 });
     requeueCount.current = new Map();
 
-    fetch(`/api/review?novelId=${novelId}&count=${count}`)
-      .then((r) => r.json())
-      .then((data: ReviewData) => {
-        const dueCards = data.due.map((d) => ({ entry: d.vocab, isNew: false }));
-        const newCards = data.newWords.map((w) => ({ entry: w, isNew: true }));
-        setCards([...dueCards, ...newCards]);
-        setLoading(false);
-      });
-  }, [novelId, count, storageKey]);
+    if (isGuest) {
+      // Guest mode: fetch cards from the guest endpoint, passing locally-known IDs
+      const knownIds = [
+        ...guestGetLearnedIds(parseInt(novelId)),
+        ...guestGetBlacklistedIds(),
+      ];
+      const knownParam = knownIds.length > 0 ? `&knownIds=${knownIds.join(",")}` : "";
+      fetch(`/api/review/guest?novelId=${novelId}&count=${count}${knownParam}`)
+        .then((r) => r.json())
+        .then((data: GuestReviewData) => {
+          const allCards = data.words.map((w) => ({ entry: w, isNew: true }));
+          setCards(allCards);
+          setLoading(false);
+        });
+    } else {
+      // Authenticated mode: fetch from the standard review endpoint
+      fetch(`/api/review?novelId=${novelId}&count=${count}`)
+        .then((r) => r.json())
+        .then((data: ReviewData) => {
+          const dueCards = data.due.map((d) => ({ entry: d.vocab, isNew: false }));
+          const newCards = data.newWords.map((w) => ({ entry: w, isNew: true }));
+          setCards([...dueCards, ...newCards]);
+          setLoading(false);
+        });
+    }
+  }, [novelId, count, storageKey, isGuest]);
 
   // On mount: rehydrate from sessionStorage if a valid snapshot exists; otherwise fetch fresh
   useEffect(() => {
@@ -148,11 +179,17 @@ export default function StudyPage() {
       const shouldPersist = grade !== 1 || fails >= MAX_REQUEUES;
 
       if (shouldPersist) {
-        await fetch("/api/review", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ vocabId: card.entry.id, grade }),
-        });
+        if (isGuest) {
+          // Guest mode: run SM-2 locally and save to localStorage
+          guestRecordReview(card.entry.id, grade, parseInt(novelId));
+        } else {
+          // Authenticated mode: persist to DB via API
+          await fetch("/api/review", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ vocabId: card.entry.id, grade }),
+          });
+        }
       }
 
       const isCorrect = grade >= 3;
@@ -177,24 +214,30 @@ export default function StudyPage() {
 
       setSubmitting(false);
     },
-    [cards, current, advance]
+    [cards, current, advance, isGuest, novelId]
   );
 
   const handleBlacklist = useCallback(async () => {
     if (!cards[current]) return;
     setSubmitting(true);
 
-    await fetch("/api/blacklist", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ vocabId: cards[current].entry.id }),
-    });
+    if (isGuest) {
+      // Guest mode: blacklist locally in localStorage
+      guestBlacklist(cards[current].entry.id);
+    } else {
+      // Authenticated mode: blacklist via API
+      await fetch("/api/blacklist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ vocabId: cards[current].entry.id }),
+      });
+    }
 
     const updatedCards = [...cards];
     updatedCards.splice(current, 1);
     advance(updatedCards, current < updatedCards.length ? current : 0);
     setSubmitting(false);
-  }, [cards, current, advance]);
+  }, [cards, current, advance, isGuest]);
 
   if (loading) {
     return (
@@ -243,12 +286,21 @@ export default function StudyPage() {
           >
             Keep Studying
           </button>
-          <Link
-            href="/analytics"
-            className="w-full px-6 py-3 rounded-full border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold text-center hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
-          >
-            View Progress
-          </Link>
+          {isGuest ? (
+            <Link
+              href="/register"
+              className="w-full px-6 py-3 rounded-full border border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300 font-semibold text-center hover:bg-amber-50 dark:hover:bg-amber-900/30 transition-colors"
+            >
+              Sign up to save progress
+            </Link>
+          ) : (
+            <Link
+              href="/analytics"
+              className="w-full px-6 py-3 rounded-full border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold text-center hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+            >
+              View Progress
+            </Link>
+          )}
           <Link
             href={`/novel/${novelId}`}
             className="w-full px-6 py-3 rounded-full bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 font-semibold text-center hover:opacity-80 transition-opacity"

@@ -68,6 +68,11 @@ export default function LoginPage() {
             Create one
           </Link>
         </p>
+        <p className="mt-2 text-center text-sm">
+          <Link href="/" className="text-zinc-400 hover:text-zinc-600 transition-colors">
+            Continue as guest →
+          </Link>
+        </p>
       </div>
     </div>
   );

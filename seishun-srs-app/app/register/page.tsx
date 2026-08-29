@@ -82,6 +82,11 @@ export default function RegisterPage() {
             Sign in
           </Link>
         </p>
+        <p className="mt-2 text-center text-sm">
+          <Link href="/" className="text-zinc-400 hover:text-zinc-600 transition-colors">
+            Try as guest first →
+          </Link>
+        </p>
       </div>
     </div>
   );

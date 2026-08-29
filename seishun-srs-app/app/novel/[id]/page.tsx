@@ -8,6 +8,7 @@ import SessionStarter from "@/components/SessionStarter";
 import CrossNovelSetup from "@/components/CrossNovelSetup";
 import StatCard from "@/components/StatCard";
 import { getNovelStats } from "@/lib/repositories/vocab";
+import GuestNovelStats from "@/components/GuestNovelStats";
 
 export const dynamic = "force-dynamic";
 
@@ -129,7 +130,57 @@ export default async function NovelDashboard({ params }: PageProps) {
   if (isNaN(novelId)) notFound();
 
   const user = await getUser();
-  if (!user) redirect("/login");
+  const isGuest = !user;
+
+  // Guest mode: show a simplified dashboard with client-side stats
+  if (isGuest) {
+    const novel = await prisma.novel.findUnique({
+      where: { id: novelId },
+      include: { _count: { select: { vocabEntries: true } } },
+    });
+    if (!novel) notFound();
+
+    return (
+      <div className="flex flex-col items-center min-h-screen px-4 py-10 gap-8">
+        <div className="w-full max-w-lg">
+          <Link href="/" className="text-sm text-zinc-400 hover:text-zinc-600 transition-colors">
+            ← All novels
+          </Link>
+        </div>
+
+        <div className="w-full max-w-lg flex gap-5 items-center bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-700 p-5 shadow-sm">
+          {novel.coverImage && (
+            <div className="relative w-20 h-28 shrink-0 rounded-lg overflow-hidden shadow">
+              <Image
+                src={`/${novel.coverImage}`}
+                alt={novel.title}
+                fill
+                sizes="80px"
+                className="object-cover"
+              />
+            </div>
+          )}
+          <div className="min-w-0">
+            <h1 className="text-lg font-bold text-zinc-900 dark:text-zinc-50 leading-snug">
+              {novel.title}
+            </h1>
+            <p className="text-sm text-zinc-400 mt-1">{novel._count.vocabEntries} words total</p>
+          </div>
+        </div>
+
+        <GuestNovelStats novelId={novelId} totalVocab={novel._count.vocabEntries} />
+
+        <div className="w-full max-w-lg flex flex-col gap-3">
+          <Link
+            href={`/vocab?novelId=${novelId}`}
+            className="flex items-center justify-center w-full py-3 rounded-2xl border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-medium transition-colors"
+          >
+            Browse vocabulary
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col items-center min-h-screen px-4 py-10 gap-8">
