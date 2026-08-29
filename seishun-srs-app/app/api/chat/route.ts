@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import Groq from "groq-sdk";
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-const MODEL = "llama-3.3-70b-versatile";
+const MODEL = "qwen/qwen3.6-27b";
 
 // POST /api/chat
 // Body: { question: string, vocabContext?: { word, reading, meaning } }
