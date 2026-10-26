@@ -371,15 +371,25 @@ export default function StudyPage({ isGuest }: StudyPageProps) {
         I already know this word — skip permanently
       </button>
 
-      {/* AI Tutor */}
-      <TutorDrawer
-        vocabContext={{
-          word: card.entry.kanji ?? card.entry.kana,
-          reading: card.entry.allReadings[0] ?? card.entry.kana,
-          meaning: card.entry.meaning,
-          partsOfSpeech: card.entry.partsOfSpeech,
-        }}
-      />
+      {/* AI Tutor — authenticated only */}
+      {isGuest ? (
+        <p className="text-xs text-zinc-400 mt-2">
+          🤖{" "}
+          <Link href="/register" className="underline hover:text-indigo-500 transition-colors">
+            Sign up
+          </Link>{" "}
+          to unlock the AI tutor
+        </p>
+      ) : (
+        <TutorDrawer
+          vocabContext={{
+            word: card.entry.kanji ?? card.entry.kana,
+            reading: card.entry.allReadings[0] ?? card.entry.kana,
+            meaning: card.entry.meaning,
+            partsOfSpeech: card.entry.partsOfSpeech,
+          }}
+        />
+      )}
     </div>
   );
 }

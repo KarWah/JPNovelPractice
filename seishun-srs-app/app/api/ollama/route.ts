@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getUserFromRequest } from "@/lib/auth";
 
 const OLLAMA_BASE = process.env.OLLAMA_BASE_URL ?? "http://localhost:11434";
 const MODEL = "simmer-gemma";
@@ -7,6 +8,11 @@ const MODEL = "simmer-gemma";
 // Body: { question: string, vocabContext: { kanji, kana, meaning } }
 // Streams the Ollama response back to the client.
 export async function POST(req: NextRequest) {
+  const user = await getUserFromRequest(req);
+  if (!user) {
+    return Response.json({ error: "Sign up to use the AI tutor." }, { status: 401 });
+  }
+
   const { question, vocabContext } = await req.json();
 
   if (!question) {

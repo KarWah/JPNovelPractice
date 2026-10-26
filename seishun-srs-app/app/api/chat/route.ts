@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import Groq from "groq-sdk";
+import { getUserFromRequest } from "@/lib/auth";
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const MODEL = "qwen/qwen3.8-27b";
@@ -8,6 +9,11 @@ const MODEL = "qwen/qwen3.8-27b";
 // Body: { question: string, vocabContext?: { word, reading, meaning } }
 // Streams NDJSON lines: { message: { content: "token" } }
 export async function POST(req: NextRequest) {
+  const user = await getUserFromRequest(req);
+  if (!user) {
+    return Response.json({ error: "Sign up to use the AI tutor." }, { status: 401 });
+  }
+
   const { question, vocabContext } = await req.json();
 
   if (!question) {
