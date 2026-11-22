@@ -4,6 +4,9 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import FuriganaText from "@/components/FuriganaText";
 import TutorDrawer from "@/components/TutorDrawer";
+import KanjiVisualizer from "@/components/KanjiVisualizer";
+import AudioButton from "@/components/AudioButton";
+import { getKanjiVGData } from "@/lib/kanjivg";
 import { JLPT_COLORS_BORDER, formatPOS, extractKanji } from "@/lib/jp";
 import { addToStudyDeck, blacklistWord, unblacklistWord } from "./actions";
 import { StartStudyButton } from "./StartStudyButton";
@@ -36,6 +39,33 @@ export default async function VocabDetailPage({ params }: PageProps) {
     where: { character: { in: kanjiChars } },
   });
   const kanjiMap = Object.fromEntries(kanjiData.map((k) => [k.character, k]));
+
+  // Server-side prefetch for instant 0ms first paint
+  let initialKanjiData = null;
+  if (kanjiChars.length > 0) {
+    const firstChar = kanjiChars[0];
+    const vg = await getKanjiVGData(firstChar);
+    if (vg) {
+      const k = kanjiMap[firstChar];
+      initialKanjiData = {
+        character: vg.character,
+        hexCode: vg.hexCode,
+        strokeCount: vg.strokeCount,
+        strokes: vg.strokes,
+        components: vg.components,
+        dictionary: k
+          ? {
+              onyomi: k.onyomi,
+              kunyomi: k.kunyomi,
+              meanings: k.meanings,
+              jlptLevel: k.jlptLevel,
+              grade: k.grade,
+              frequency: k.frequency,
+            }
+          : null,
+      };
+    }
+  }
 
   const [prevEntry, nextEntry] = await Promise.all([
     prisma.vocabEntry.findFirst({
@@ -79,9 +109,12 @@ export default async function VocabDetailPage({ params }: PageProps) {
       <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-700 p-8 mb-4">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-5xl font-bold text-zinc-900 dark:text-zinc-50 tracking-wide mb-2">
-              {displayWord}
-            </h1>
+            <div className="flex items-center gap-3 mb-2">
+              <h1 className="text-5xl font-bold text-zinc-900 dark:text-zinc-50 tracking-wide">
+                {displayWord}
+              </h1>
+              <AudioButton text={primaryReading || displayWord} size="lg" />
+            </div>
             {showReading && (
               <p className="text-xl text-zinc-400 dark:text-zinc-500">{primaryReading}</p>
             )}
@@ -134,53 +167,8 @@ export default async function VocabDetailPage({ params }: PageProps) {
       </Section>
 
       {kanjiChars.length > 0 && (
-        <Section title="Kanji breakdown">
-          <div className="space-y-4">
-            {kanjiChars.map((char: string) => {
-              const k = kanjiMap[char];
-              return (
-                <div key={char} className="flex gap-4 items-start p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl">
-                  <div className="text-4xl font-bold text-zinc-900 dark:text-zinc-50 w-12 shrink-0 text-center">
-                    {char}
-                  </div>
-                  {k ? (
-                    <div className="flex flex-col gap-1.5 flex-1 min-w-0">
-                      {k.onyomi.length > 0 && (
-                        <div className="flex gap-2 items-baseline flex-wrap">
-                          <span className="text-xs font-semibold text-zinc-400 w-14 shrink-0">On'yomi</span>
-                          <div className="flex flex-wrap gap-1">
-                            {k.onyomi.map((r: string) => (
-                              <span key={r} className="text-sm font-medium text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-900/30 px-2 py-0.5 rounded">{r}</span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {k.kunyomi.length > 0 && (
-                        <div className="flex gap-2 items-baseline flex-wrap">
-                          <span className="text-xs font-semibold text-zinc-400 w-14 shrink-0">Kun'yomi</span>
-                          <div className="flex flex-wrap gap-1">
-                            {k.kunyomi.map((r: string) => (
-                              <span key={r} className="text-sm font-medium text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-900/30 px-2 py-0.5 rounded">{r}</span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {k.meanings.length > 0 && (
-                        <p className="text-sm text-zinc-500 dark:text-zinc-400">{k.meanings.join(", ")}</p>
-                      )}
-                      <div className="flex gap-3 mt-0.5">
-                        {k.jlptLevel && <span className="text-[10px] text-zinc-400">{k.jlptLevel}</span>}
-                        {k.strokeCount && <span className="text-[10px] text-zinc-400">{k.strokeCount} strokes</span>}
-                        {k.grade && <span className="text-[10px] text-zinc-400">Grade {k.grade}</span>}
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-zinc-400 pt-1">No KANJIDIC data yet.</p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+        <Section title="Kanji Stroke Order & Radicals">
+          <KanjiVisualizer kanjiChars={kanjiChars} initialData={initialKanjiData} />
         </Section>
       )}
 
@@ -188,11 +176,17 @@ export default async function VocabDetailPage({ params }: PageProps) {
         <Section title="Example sentences">
           <div className="space-y-3">
             {entry.sentences.map((s: { id: number; japaneseText: string; englishTrans: string }) => (
-              <div key={s.id} className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl">
-                <p className="text-base leading-relaxed text-zinc-800 dark:text-zinc-200">
-                  <FuriganaText text={s.japaneseText} />
-                </p>
-                <p className="text-sm text-zinc-400 mt-1.5">{s.englishTrans}</p>
+              <div
+                key={s.id}
+                className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl flex items-start justify-between gap-3"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-base leading-relaxed text-zinc-800 dark:text-zinc-200">
+                    <FuriganaText text={s.japaneseText} />
+                  </p>
+                  <p className="text-sm text-zinc-400 mt-1.5">{s.englishTrans}</p>
+                </div>
+                <AudioButton text={s.japaneseText} size="sm" className="mt-0.5" />
               </div>
             ))}
           </div>

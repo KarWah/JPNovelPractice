@@ -7,6 +7,8 @@ import ReviewButtons from "@/components/ReviewButtons";
 import TutorDrawer from "@/components/TutorDrawer";
 import type { Grade } from "@/lib/srs";
 import type { SessionCard, VocabCardEntry } from "@/lib/types";
+import { extractKanji } from "@/lib/jp";
+import { prefetchKanji } from "@/lib/kanjiClient";
 import Link from "next/link";
 import {
   recordReview as guestRecordReview,
@@ -97,6 +99,16 @@ export default function StudyPage({ isGuest }: StudyPageProps) {
     };
     try { sessionStorage.setItem(storageKey, JSON.stringify(snapshot)); } catch { /* quota */ }
   }, [cards, current, revealed, stats, sessionDone, loading, storageKey]);
+
+  // Pre-load kanji stroke order data in the background for current & upcoming cards
+  useEffect(() => {
+    if (cards.length === 0) return;
+    const upcoming = cards.slice(current, current + 4);
+    const kanjiList = upcoming.flatMap((c) => extractKanji(c.entry.kanji ?? c.entry.kana));
+    if (kanjiList.length > 0) {
+      prefetchKanji(kanjiList);
+    }
+  }, [cards, current]);
 
   const loadCards = useCallback(() => {
     if (typeof window !== "undefined") sessionStorage.removeItem(storageKey);

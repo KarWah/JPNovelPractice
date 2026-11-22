@@ -1,7 +1,12 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import FuriganaText from "./FuriganaText";
 import Link from "next/link";
+import KanjiVisualizer from "./KanjiVisualizer";
+import AudioButton from "./AudioButton";
+import { extractKanji } from "@/lib/jp";
+import { prefetchKanji } from "@/lib/kanjiClient";
 import type { VocabCardEntry } from "@/lib/types";
 
 interface VocabCardProps {
@@ -11,17 +16,29 @@ interface VocabCardProps {
 }
 
 export default function VocabCard({ entry, revealed, onReveal }: VocabCardProps) {
+  const [showKanjiVisualizer, setShowKanjiVisualizer] = useState(false);
   const display = entry.kanji ?? entry.kana;
   const primaryReading = entry.allReadings[0] ?? entry.kana;
   const meanings = entry.allMeanings.length > 0 ? entry.allMeanings : [entry.meaning];
+  const kanjiChars = extractKanji(display);
+
+  // Prefetch stroke order and radical data in the background immediately
+  useEffect(() => {
+    if (kanjiChars.length > 0) {
+      prefetchKanji(kanjiChars);
+    }
+  }, [kanjiChars]);
 
   return (
     <div className="w-full max-w-lg bg-white dark:bg-zinc-900 rounded-2xl shadow-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
       {/* Front — always visible */}
       <div className="flex flex-col items-center gap-2 px-8 pt-10 pb-6">
-        <p className="text-5xl font-bold tracking-wide text-zinc-900 dark:text-zinc-50">
-          {display}
-        </p>
+        <div className="flex items-center gap-3">
+          <p className="text-5xl font-bold tracking-wide text-zinc-900 dark:text-zinc-50">
+            {display}
+          </p>
+          <AudioButton text={primaryReading || display} size="md" />
+        </div>
         {primaryReading !== display && (
           <p className="text-lg text-zinc-500 dark:text-zinc-400">{primaryReading}</p>
         )}
@@ -105,20 +122,51 @@ export default function VocabCard({ entry, revealed, onReveal }: VocabCardProps)
               </p>
               <div className="space-y-2">
                 {entry.sentences.slice(0, 2).map((s) => (
-                  <div key={s.id} className="bg-zinc-50 dark:bg-zinc-800 rounded-lg px-4 py-3">
-                    <p className="text-base text-zinc-800 dark:text-zinc-200">
-                      <FuriganaText text={s.japaneseText} />
-                    </p>
-                    <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-                      {s.englishTrans}
-                    </p>
+                  <div
+                    key={s.id}
+                    className="bg-zinc-50 dark:bg-zinc-800 rounded-lg px-4 py-3 flex items-start justify-between gap-3"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-base text-zinc-800 dark:text-zinc-200">
+                        <FuriganaText text={s.japaneseText} />
+                      </p>
+                      <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
+                        {s.englishTrans}
+                      </p>
+                    </div>
+                    <AudioButton text={s.japaneseText} size="sm" className="mt-0.5" />
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          <div className="pt-1">
+          {/* Kanji Stroke Order & Radicals Toggle */}
+          {kanjiChars.length > 0 && (
+            <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800">
+              <button
+                type="button"
+                onClick={() => setShowKanjiVisualizer((v) => !v)}
+                className="w-full py-2 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-700/80 text-xs font-semibold text-zinc-700 dark:text-zinc-300 flex items-center justify-between transition-colors"
+              >
+                <span className="flex items-center gap-1.5">
+                  <span>✍️</span>
+                  <span>Stroke Order & Radicals ({kanjiChars.join(" ")})</span>
+                </span>
+                <span className="text-zinc-400 font-mono text-[11px]">
+                  {showKanjiVisualizer ? "Hide ▲" : "Show ▼"}
+                </span>
+              </button>
+
+              {showKanjiVisualizer && (
+                <div className="mt-3 p-3 rounded-xl bg-zinc-50/70 dark:bg-zinc-950/40 border border-zinc-200 dark:border-zinc-800">
+                  <KanjiVisualizer kanjiChars={kanjiChars} compact={true} />
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="pt-1 flex items-center justify-between">
             <Link
               href={`/vocab/${entry.id}`}
               className="text-xs text-indigo-500 hover:text-indigo-700 transition-colors"
