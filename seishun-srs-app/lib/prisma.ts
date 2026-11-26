@@ -11,8 +11,9 @@ function createClient(connectionString?: string) {
   const pool = new Pool({
     connectionString: url,
     ssl: isLocal ? false : { rejectUnauthorized: false },
-    max: 10,
+    max: process.env.NODE_ENV === "production" ? 2 : 5,
     connectionTimeoutMillis: 10000,
+    idleTimeoutMillis: 20000,
   });
   const adapter = new PrismaPg(pool);
   return new PrismaClient({
