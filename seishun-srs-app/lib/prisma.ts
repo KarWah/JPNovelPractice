@@ -11,6 +11,8 @@ function createClient(connectionString?: string) {
   const pool = new Pool({
     connectionString: url,
     ssl: isLocal ? false : { rejectUnauthorized: false },
+    max: 10,
+    connectionTimeoutMillis: 10000,
   });
   const adapter = new PrismaPg(pool);
   return new PrismaClient({
@@ -22,10 +24,7 @@ function createClient(connectionString?: string) {
 const g = globalThis as unknown as { prisma: PrismaClient | undefined };
 
 export const prisma = g.prisma ?? createClient(process.env.DATABASE_URL);
-
-if (process.env.NODE_ENV !== "production") {
-  g.prisma = prisma;
-}
+g.prisma = prisma;
 
 // Legacy alias — remove once all callers are updated
 export const adminPrisma = prisma;
